@@ -1,6 +1,1 @@
-#from model.gran_mixture_bernoulli import *
 from model.gran_mixture_bernoulli_evaluation import GRANMixtureBernoulli_Evaluation
-from model.gran_mixture_bernoulli_nwsg import GRANMixtureBernoulli_NWSG
-from model.gran_mixture_bernoulli_ebag import GRANMixtureBernoulli_EBAG
-from model.gran_mixture_bernoulli_all import GRANMixtureBernoulli_ALL
-#from model.gran_mixture_bernoulli_proteins import *

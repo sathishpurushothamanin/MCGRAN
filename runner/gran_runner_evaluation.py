@@ -51,10 +51,6 @@ from nasbench import api
 from nasbench.lib.model_spec import is_upper_triangular
 
 
-# Use nasbench_full.tfrecord for full dataset (run download command above).
-filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
-nasbench = api.NASBench(filepath, seed = 1234)
-
 from sklearn import metrics
 try:
   ###
@@ -434,6 +430,10 @@ class GranRunner_Evaluation(object):
     return 1
 
   def test(self):
+      
+    # Use nasbench_full.tfrecord for full dataset (run download command above).
+    filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
+    nasbench = api.NASBench(filepath, seed = 1234)
 #  
 #    
 #    # nasbench.config['num_repeats'] = 1
@@ -463,50 +463,7 @@ class GranRunner_Evaluation(object):
     A_pred = []
     num_nodes_pred = []
     num_test_batch = int(np.ceil(self.num_test_gen / self.test_conf.batch_size))
-    #nd = node degree
-    #[nd1, nd2, nd3, nd4, nd5, nd6, nd7, num_parameters, training_time]
-    #[num_parameters, training_time]
-#    conditional_data = np.array([[0., 1., 0., 0., 1., 0., 0., 0., 0.],
-#        [0., 1., 1., 0., 0., 0., 1., 0., 0.],
-#        [0., 1., 1., 0., 1., 0., 0., 0., 1.],
-#        [0., 0., 1., 0., 0., 1., 0., 1., 1.],
-#        [1., 1., 0., 0., 1., 0., 0., 1., 1.],
-#        [0., 1., 0., 0., 0., 1., 1., 0., 0.],
-#        [1., 1., 1., 1., 1., 0., 0., 1., 1.],
-#        [0., 1., 1., 0., 1., 0., 0., 1., 1.],
-#        [0., 1., 1., 0., 0., 1., 0., 0., 0.],
-#        [1., 0., 1., 1., 0., 1., 0., 0., 0.],
-#        [1., 1., 0., 0., 0., 1., 0., 0., 0.],
-#        [1., 0., 1., 1., 1., 1., 0., 1., 1.],
-#        [1., 1., 0., 0., 0., 1., 1., 0., 1.],
-#        [0., 0., 1., 1., 0., 1., 0., 0., 0.],
-#        [0., 1., 0., 0., 0., 1., 1., 0., 1.],
-#        [0., 0., 1., 1., 0., 0., 1., 0., 0.],
-#        [1., 1., 0., 0., 0., 0., 1., 0., 0.],
-#        [1., 1., 0., 0., 1., 0., 0., 0., 0.],
-#        [0., 1., 1., 0., 1., 0., 0., 0., 0.],
-#        [0., 1., 0., 1., 0., 1., 0., 0., 0.]])
-#    conditional_data = np.array([[0., 0.],
-#        [0., 0.],
-#        [0., 1.],
-#        [1., 1.],
-#        [1., 1.],
-#        [0., 0.],
-#        [1., 1.],
-#        [1., 1.],
-#        [0., 0.],
-#        [0., 0.],
-#        [0., 0.],
-#        [1., 1.],
-#        [0., 1.],
-#        [0., 0.],
-#        [0., 1.],
-#        [0., 0.],
-#        [0., 0.],
-#        [0., 0.],
-#        [0., 0.],
-#        [0., 0.]])
-#    conditional_data = torch.from_numpy(conditional_data).float()
+
     
     conditional_data = np.concatenate((np.float32(np.random.choice([0, 1], 
                                        size=(self.test_conf.batch_size, 2))), 
@@ -620,126 +577,66 @@ class GranRunner_Evaluation(object):
     print('Number of valid graphs ', len(self.accuracy_list))
     pickle.dump(self.accuracy_list, open(os.path.join(self.config.save_dir, 'test_accuracy_gen.p'), 'wb'))
 
-#    print('Generated Graphs - Model Trainable Parameters Statistics')
-#    print('Mean ', np.mean(self.trainable_parameters_list))
-#    print('Standard Deviation ', np.std(self.trainable_parameters_list))
-#    print('Maximum ', np.max(self.trainable_parameters_list))
-#    print('Minimum ', np.min(self.trainable_parameters_list))
-#
-#    print('Generated Graphs - Model Training Time Statistics')
-#    print('Mean ', np.mean(self.training_time_list))
-#    print('Standard Deviation ', np.std(self.training_time_list))
-#    print('Maximum ', np.max(self.training_time_list))
-#    print('Minimum ', np.min(self.training_time_list))
-#    
-#    num_nodes_train = [gg.number_of_nodes() for gg in self.graphs_train]
-#    
-#    #Compared with Validation Set
-#    num_nodes_dev = [len(gg.nodes) for gg in self.graphs_dev]  # shape B X 1
-#    
-#    mmd_degree_dev, mmd_clustering_dev, mmd_4orbits_dev, mmd_spectral_dev = evaluate(self.graphs_train, self.graphs_dev, degree_only=False)
-#    mmd_num_nodes_dev = compute_mmd([np.bincount(num_nodes_dev)], [np.bincount(num_nodes_train)], kernel=gaussian_emd)
-#    
-#    structure_evaluation_metrics = {}
-#    structure_evaluation_metrics['num_nodes'] = mmd_num_nodes_dev
-#    structure_evaluation_metrics['degree'] = mmd_degree_dev
-#    structure_evaluation_metrics['clustering'] = mmd_clustering_dev
-#    structure_evaluation_metrics['4orbits'] = mmd_4orbits_dev
-#    structure_evaluation_metrics['spectral'] = mmd_spectral_dev
-#    
-#    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
-#      pickle.dump(self.test_accuracy_train, open(os.path.join(self.config.save_dir, 'test_accuracy_train.p'), 'wb'))
-#      pickle.dump(self.test_accuracy_test, open(os.path.join(self.config.save_dir, 'test_accuracy_test.p'), 'wb'))
+    print('Generated Graphs - Model Trainable Parameters Statistics')
+    print('Mean ', np.mean(self.trainable_parameters_list))
+    print('Standard Deviation ', np.std(self.trainable_parameters_list))
+    print('Maximum ', np.max(self.trainable_parameters_list))
+    print('Minimum ', np.min(self.trainable_parameters_list))
+
+    print('Generated Graphs - Model Training Time Statistics')
+    print('Mean ', np.mean(self.training_time_list))
+    print('Standard Deviation ', np.std(self.training_time_list))
+    print('Maximum ', np.max(self.training_time_list))
+    print('Minimum ', np.min(self.training_time_list))
+    
+    num_nodes_train = [gg.number_of_nodes() for gg in self.graphs_train]
+    
+    #Compared with Validation Set
+    num_nodes_dev = [len(gg.nodes) for gg in self.graphs_dev]  # shape B X 1
+    
+    mmd_degree_dev, mmd_clustering_dev, mmd_4orbits_dev, mmd_spectral_dev = evaluate(self.graphs_train, self.graphs_dev, degree_only=False)
+    mmd_num_nodes_dev = compute_mmd([np.bincount(num_nodes_dev)], [np.bincount(num_nodes_train)], kernel=gaussian_emd)
+    
+    structure_evaluation_metrics = {}
+    structure_evaluation_metrics['num_nodes'] = mmd_num_nodes_dev
+    structure_evaluation_metrics['degree'] = mmd_degree_dev
+    structure_evaluation_metrics['clustering'] = mmd_clustering_dev
+    structure_evaluation_metrics['4orbits'] = mmd_4orbits_dev
+    structure_evaluation_metrics['spectral'] = mmd_spectral_dev
+    
+    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
+      pickle.dump(self.test_accuracy_train, open(os.path.join(self.config.save_dir, 'test_accuracy_train.p'), 'wb'))
+      pickle.dump(self.test_accuracy_test, open(os.path.join(self.config.save_dir, 'test_accuracy_test.p'), 'wb'))
       
-    ### Evaluate Generated Graphs
-#    structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
-#    
-#    logger.info("Test MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['test']['num_nodes'], 
-#                structure_evaluation_metrics['test']['node_degree'], 
-#                structure_evaluation_metrics['test']['node_clustering'], 
-#                structure_evaluation_metrics['test']['graph_4orbits'],
-#                structure_evaluation_metrics['test']['graph_spectral'],
-#                structure_evaluation_metrics['test']['NSPDK']))
-#    
-#    logger.info("Dev MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['dev']['num_nodes'], 
-#                structure_evaluation_metrics['dev']['node_degree'], 
-#                structure_evaluation_metrics['dev']['node_clustering'], 
-#                structure_evaluation_metrics['dev']['graph_4orbits'],
-#                structure_evaluation_metrics['dev']['graph_spectral'],
-#                structure_evaluation_metrics['test']['NSPDK']))
-#    
-#    logger.info("Generated Graphs #self-loops/isolated_nodes/invalid_nn are = {}/{}/{}".format(structure_evaluation_metrics['self_loops'],
-#                structure_evaluation_metrics['isolated_nodes'],
-#                structure_evaluation_metrics['invalid_nn']))
-#    
-#    logger.info("The uniqueness of the generated graphs:")
-#    for key in sorted(structure_evaluation_metrics['uniqueness']):
-#        logger.info("{}: {}".format(key, round(structure_evaluation_metrics['uniqueness'][key], 2)))
-#    
-#    logger.info("The novelty of the generated graphs:")
-#    for key in sorted(structure_evaluation_metrics['novelty']):
-#        logger.info("{}: {}".format(key, round(structure_evaluation_metrics['novelty'][key], 2)))
-#        
-#    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
-#    ### Visualize Generated Graphs
-#    visualize_graphs(self.config, A_pred, self.graphs_train)
-
-
-
-  def optimize(self):    
-    # nasbench.config['num_repeats'] = 1
-
-    # freeup cache
-    # free_up_cache()
-
-    ### load model
-    model = eval(self.model_conf.name)(self.config)
-    model_file = os.path.join(self.test_conf.test_model_dir, self.test_conf.test_model_name)
-    load_model(model, model_file, self.device)
+    ## Evaluate Generated Graphs
+    structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
     
-
-
-    if self.use_gpu:
-        model = nn.DataParallel(model, device_ids=self.gpus).to(self.device)
-
-    model.eval()
-
-    #display model details
-    if self.config.model.display_detailed_model:
-        display_model(model)
-
-    #edge_predictor optimization
-    input_dict = {}
-    input_dict['is_sampling']=True
-    input_dict['batch_size']=self.test_conf.batch_size
-    input_dict['num_nodes_pmf']=self.num_nodes_pmf_train
-    edge_predictor_layer_name = 'module.output_theta.4.weight'
-    model.load_state_dict(evolution(model, edge_predictor_layer_name, input_dict, self.config))
-
-#    snapshot(model.module if self.use_gpu else model, model.optimizer, self.config, 0, scheduler=model.scheduler)
-
-
-    ### Generate Graphs
-    A_pred = []
-    num_nodes_pred = []
-    num_test_batch = int(np.ceil(self.num_test_gen / self.test_conf.batch_size))
-
-    gen_run_time = []
-    graphs_gen_nodes = []
-    for ii in tqdm(range(num_test_batch)):
-        with torch.no_grad():
-          start_time = time.time()
-          A_tmp, graphs_node_list = model(input_dict)
-          gen_run_time += [time.time() - start_time]
-          A_pred += [aa.data.cpu().numpy() for aa in A_tmp]
-          num_nodes_pred += [aa.shape[0] for aa in A_tmp]
-          graphs_gen_nodes.append(graphs_node_list)
-
-    logger.info('Average test time per mini-batch = {}'.format(
-      np.mean(gen_run_time)))
-
-    ### Evaluate Generated Graphs
-    evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
+    logger.info("Test MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['test']['num_nodes'], 
+                structure_evaluation_metrics['test']['node_degree'], 
+                structure_evaluation_metrics['test']['node_clustering'], 
+                structure_evaluation_metrics['test']['graph_4orbits'],
+                structure_evaluation_metrics['test']['graph_spectral'],
+                structure_evaluation_metrics['test']['NSPDK']))
     
+    logger.info("Dev MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['dev']['num_nodes'], 
+                structure_evaluation_metrics['dev']['node_degree'], 
+                structure_evaluation_metrics['dev']['node_clustering'], 
+                structure_evaluation_metrics['dev']['graph_4orbits'],
+                structure_evaluation_metrics['dev']['graph_spectral'],
+                structure_evaluation_metrics['test']['NSPDK']))
+    
+    logger.info("Generated Graphs #self-loops/isolated_nodes/invalid_nn are = {}/{}/{}".format(structure_evaluation_metrics['self_loops'],
+                structure_evaluation_metrics['isolated_nodes'],
+                structure_evaluation_metrics['invalid_nn']))
+    
+    logger.info("The uniqueness of the generated graphs:")
+    for key in sorted(structure_evaluation_metrics['uniqueness']):
+        logger.info("{}: {}".format(key, round(structure_evaluation_metrics['uniqueness'][key], 2)))
+    
+    logger.info("The novelty of the generated graphs:")
+    for key in sorted(structure_evaluation_metrics['novelty']):
+        logger.info("{}: {}".format(key, round(structure_evaluation_metrics['novelty'][key], 2)))
+        
+    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
     ### Visualize Generated Graphs
     visualize_graphs(self.config, A_pred, self.graphs_train)
