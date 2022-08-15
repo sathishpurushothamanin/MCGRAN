@@ -1,0 +1,73 @@
+---
+exp_name: Higher_Order_Search
+exp_dir: exp/Higher_Order_Search
+runner: GranRunner_Higher_Order_Search
+use_horovod: False
+use_gpu: True
+device: cuda:6
+gpus: [6]
+seed: 67812345
+free_cache: False
+dataset:
+  loader_name: GRANData_Node_Level
+  name: nas
+  data_path: data/nas-101/
+  max_num_samples: 100
+  min_test_accuracy: 0
+  max_test_accuracy: 75
+  node_order: none # k_core/BFS/degree_decent
+  train_ratio: 0.8
+  dev_ratio: 0.2
+  num_subgraph_batch: 2 # number of subgraphs per mini-batch
+  num_fwd_pass: 2
+  has_node_feat: False
+  is_save_split: True
+  is_sample_subgraph: True # set to true if you want to sample subgraphs
+  is_overwrite_precompute: True
+model:
+  name: GRANMixtureBernoulli_Evaluation
+  num_mix_component: 64
+  is_sym: False
+  block_size: 1
+  sample_stride: 1
+  max_num_nodes: 5
+  hidden_dim: 256
+  embedding_dim: 256
+  num_GNN_layers: 7
+  num_GNN_prop: 1
+  num_canonical_order: 1
+  dimension_reduce: True
+  has_attention: True
+  edge_weight: 1.0e+0
+  display_detailed_model: False
+train:
+  optimizer: Adam
+  lr_decay: 0.1
+  lr_decay_epoch: [100000000] # no decay
+  num_workers: 0
+  max_epoch: 100
+  batch_size: 20
+  display_iter: 10
+  snapshot_epoch: 100
+  valid_epoch: 50
+  lr: 1.0e-4
+  wd: 0.0e-4
+  momentum: 0.9
+  shuffle: True
+  is_resume: False
+  resume_epoch: 100 #5000
+  resume_dir: # exp/GRAN/your_exp_folder
+  resume_model: #model_snapshot_0005000.pth
+test:
+  batch_size: 20
+  num_workers: 0
+  num_test_gen: 20 # number of generated samples
+  is_vis: True
+  is_single_plot: False # visualize `num_vis` samples in a single image
+  is_test_ER: False # test Erdos-Renyi baseline
+  num_vis: 10
+  vis_num_row: 1 # visualize `num_vis` samples in `vis_num_row` rows
+  better_vis: true
+  generated_graph_data_dir: generated_data
+  test_model_dir: exp/Higher_Order_Search/106833/
+  test_model_name: model_snapshot_search_5.pth
