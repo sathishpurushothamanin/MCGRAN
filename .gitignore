@@ -22,6 +22,7 @@ nasbench/
 .Python
 build/
 tests/
+exp/
 develop-eggs/
 dist/
 downloads/
