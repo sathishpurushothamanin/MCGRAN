@@ -1,1 +1,2 @@
 from model.gran_mixture_bernoulli_evaluation import GRANMixtureBernoulli_Evaluation
+from model.gran_mixture_bernoulli_evaluation import GRANMixtureBernoulli_HOS

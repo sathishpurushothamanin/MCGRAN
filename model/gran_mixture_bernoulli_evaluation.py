@@ -6,7 +6,7 @@ import networkx as nx
 from torch_geometric.nn import SplineConv
 EPS = np.finfo(np.float32).eps
 
-__all__ = ['GRANMixtureBernoulli_Evaluation']
+__all__ = ['GRANMixtureBernoulli_Evaluation', 'GRANMixtureBernoulli_HOS']
 
 
 class GNN(nn.Module):
@@ -786,6 +786,556 @@ class GRANMixtureBernoulli_Evaluation(nn.Module):
 
       return A_list, graphs_node_list
 
+class GRANMixtureBernoulli_HOS(nn.Module):
+  """ Graph Recurrent Attention Networks """
+
+  def __init__(self, config):
+    super(GRANMixtureBernoulli_HOS, self).__init__()
+    self.config = config
+    self.device = config.device
+    self.max_num_nodes = config.model.max_num_nodes
+    self.hidden_dim = config.model.hidden_dim
+    self.is_sym = config.model.is_sym
+    self.block_size = config.model.block_size
+    self.sample_stride = config.model.sample_stride
+    self.num_GNN_prop = config.model.num_GNN_prop
+    self.num_GNN_layers = config.model.num_GNN_layers
+    self.edge_weight = config.model.edge_weight if hasattr(
+        config.model, 'edge_weight') else 1.0
+    self.dimension_reduce = config.model.dimension_reduce
+    self.has_attention = config.model.has_attention
+    self.num_canonical_order = config.model.num_canonical_order
+    self.output_dim = 1
+    self.num_mix_component = config.model.num_mix_component
+    self.has_rand_feat = True # use random feature instead of 1-of-K encoding
+    self.att_edge_dim = config.model.hidden_dim // 2 #128
+    self.num_conditional_features = self.config.num_categories
+#    self.class_weights = torch.tensor([1/self.config.class_weights[0],
+#        1/self.config.class_weights[1],
+#        1/self.config.class_weights[2],
+#        1/self.config.class_weights[3],
+#        1/self.config.class_weights[4]]).to(self.device)
+
+    self.node_predictor = nn.Sequential(
+        nn.Linear(self.hidden_dim, self.hidden_dim),
+        nn.ReLU(inplace=True),
+        nn.Linear(self.hidden_dim, self.hidden_dim),
+        nn.ReLU(inplace=True),
+        nn.Linear(self.hidden_dim, 5))
+
+    self.output_theta = nn.Sequential(
+        nn.Conv1d(16, self.hidden_dim, 1, padding='same'),
+        nn.ReLU(),
+        nn.Conv1d(self.hidden_dim, self.hidden_dim, 3, padding='same'),
+        nn.ReLU(),
+        nn.Conv1d(self.hidden_dim, 4, 5, padding='same')
+        )
+
+    self.output_alpha = nn.Sequential(
+        nn.Conv1d(16, self.hidden_dim, 1, padding='same'),
+        nn.ReLU(),
+        nn.Conv1d(self.hidden_dim, self.hidden_dim, 3, padding='same'),
+        nn.ReLU(),
+        nn.Conv1d(self.hidden_dim, 4, 5, padding='same')
+        )
+
+#    self.mu = torch.randn(self.hidden_dim, requires_grad=True)
+#    self.logstd = torch.randn(self.hidden_dim, requires_grad=True)
+    
+#    self.mu = torch.nn.parameter.Parameter(torch.randn(self.hidden_dim))
+#    self.logstd = torch.nn.parameter.Parameter(torch.randn(self.hidden_dim))
+#    self.mu = nn.Sequential(
+#        nn.Linear(self.hidden_dim, self.hidden_dim),
+#        nn.ReLU(inplace=True))
+#    
+#    self.logstd = nn.Sequential(
+#        nn.Linear(self.hidden_dim, self.hidden_dim),
+#        nn.ReLU(inplace=True))
+    
+    self.spline_conv = SplineConv(self.hidden_dim, self.hidden_dim,
+                               2, self.max_num_nodes).to(self.device)
+
+    self.conditional_feature_extractor = nn.Sequential(
+          nn.Linear(self.num_conditional_features, self.hidden_dim))
+    
+    self.condition_alpha = nn.Sequential(
+            nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim),
+            nn.ReLU(inplace=True))
+    self.condition_beta = nn.Sequential(
+            nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim),
+            nn.ReLU(inplace=True))
+    
+    if self.dimension_reduce:
+      self.embedding_dim = config.model.embedding_dim
+      self.decoder_edge_input = nn.Sequential(
+          nn.Linear(self.max_num_nodes, self.embedding_dim))
+      self.decoder_node_input = nn.Sequential(
+        nn.Conv1d(self.max_num_nodes, self.embedding_dim, 1, padding='same'),
+        nn.ReLU(),
+        nn.Conv1d(self.embedding_dim, self.embedding_dim, 3, padding='same'),
+        nn.ReLU(),
+        nn.Conv1d(self.embedding_dim, self.embedding_dim, 5, padding='same')
+        )
+    else:
+      self.embedding_dim = self.max_num_nodes
+
+    self.edge_decoder = GNN(
+        msg_dim=self.hidden_dim,
+        node_state_dim=self.hidden_dim,
+        edge_feat_dim=2 * self.att_edge_dim,
+        num_prop=self.num_GNN_prop,
+        num_layer=self.num_GNN_layers,
+        has_attention=self.has_attention)
+
+    self.node_decoder = GNN(
+        msg_dim=self.hidden_dim,
+        node_state_dim=self.hidden_dim,
+        edge_feat_dim=2 * self.att_edge_dim,
+        num_prop=self.num_GNN_prop,
+        num_layer=1,
+        has_attention=self.has_attention)
+
+    ### Loss functions
+    pos_weight = torch.ones([1]) * self.edge_weight
+    self.adj_loss_func = nn.BCEWithLogitsLoss(
+        pos_weight=pos_weight, reduction='none')
+
+    self.softmax = nn.LogSoftmax(dim=-1)
+#    self.label_loss = nn.CrossEntropyLoss(weight=self.class_weights, reduction='mean')
+    self.label_loss = nn.CrossEntropyLoss()
+
+  def get_sample(self, mu, logstd, target_shape, train = True):
+#      new_sample = torch.zeros(target_shape)
+#      for index in range(target_shape[0]):
+#          epsilon = torch.randn_like(logstd)
+#          #for search epsilon is important
+#          new_sample[index, :] = mu + torch.exp(logstd) * epsilon
+      if train:
+          epsilon = torch.randn_like(logstd)
+          std_plus_noise = abs(torch.exp(logstd) * epsilon)
+          dist = torch.distributions.normal.Normal(mu, std_plus_noise)
+      else:
+          std = abs(torch.exp(logstd))
+          dist = torch.distributions.normal.Normal(mu, std)
+      return dist.sample(target_shape)
+  
+  def _inference(self,
+                 A_pad=None,
+                 edges=None,
+                 node_idx_gnn=None,
+                 node_idx_feat=None,
+                 att_idx=None,
+                 pseudo_coordinates=None,
+                 conditional_data=None,
+                 random_search=True):
+    """ generate adj in row-wise auto-regressive fashion """
+
+    B, C, N_max, _ = A_pad.shape
+
+    A_pad = A_pad.view(B * C * N_max, -1)
+    
+
+    if self.dimension_reduce:
+      node_feat_edge = self.decoder_edge_input(A_pad)
+#      node_feat_edge = self.spline_conv(A_pad,
+#                                  edges.t(), pseudo_coordinates)
+      A_pad = A_pad.view(B * C, N_max, -1)
+      node_feat_label = self.decoder_node_input(A_pad).view(B * C * N_max, -1)
+#    else:
+#      node_feat = A_pad  # BCN_max X N_max
+
+    ### GNN inference
+    # pad zero as node feature for newly generated nodes (1st row)
+    node_feat_edge = F.pad(
+        node_feat_edge, (0, 0, 1, 0), 'constant', value=0.0)  # (BCN_max + 1) X N_max
+    conditional_features = self.conditional_feature_extractor(conditional_data)
+    alpha_condition = self.condition_alpha(conditional_features)
+    beta_condition = self.condition_beta(conditional_features)
+    alpha_condition = alpha_condition.reshape(B * N_max, self.hidden_dim)
+    beta_condition = beta_condition.reshape(B * N_max, self.hidden_dim)
+    # create symmetry-breaking edge feature for the newly generated nodes
+    att_idx = att_idx.view(-1, 1)
+
+    if self.has_rand_feat:
+      # create random feature
+      att_edge_feat = torch.zeros(edges.shape[0],
+                                  2 * self.att_edge_dim).to(node_feat_edge.device)
+      idx_new_node = (att_idx[[edges[:, 0]]] >
+                      0).long() + (att_idx[[edges[:, 1]]] > 0).long()
+      idx_new_node = idx_new_node.bool().squeeze()
+      att_edge_feat[idx_new_node, :] = torch.randn(
+              idx_new_node.long().sum(),
+              att_edge_feat.shape[1]).to(node_feat_edge.device)
+#      if random_search:
+#          att_edge_feat[idx_new_node, :] = torch.randn(
+#              idx_new_node.long().sum(),
+#              att_edge_feat.shape[1]).to(node_feat_edge.device)
+#      else:
+#          new_sample = torch.zeros(torch.Size([idx_new_node.long().sum()]))
+#          for index in range(idx_new_node.long().sum()):
+#              
+#              epsilon = torch.randn_like(self.logstd).to(node_feat_edge.device)
+#              #for search epsilon is important
+#              att_edge_feat[index, :] = self.mu + torch.exp(self.logstd) * epsilon
+#          att_edge_feat[idx_new_node, :] = new_sample
+#          sum_node_features = torch.mean(node_feat_edge, axis=0)
+#          sample_mean = self.mu(sum_node_features)
+#          sample_std = self.logstd(sum_node_features)
+#          target_shape = torch.Size([idx_new_node.long().sum()])
+#          att_edge_feat[idx_new_node, :] = self.get_sample(sample_mean, sample_std, 
+#                       target_shape, train=True).to(node_feat_edge.device)
+#          att_edge_feat[idx_new_node, :] = self.get_sample(self.mu, self.logstd, 
+#                       target_shape).to(node_feat_edge.device)
+    else:
+      # create one-hot feature
+      att_edge_feat = torch.zeros(edges.shape[0],
+                                  2 * self.att_edge_dim).to(node_feat_edge.device)
+      # scatter with empty index seems to cause problem on CPU but not on GPU
+      att_edge_feat = att_edge_feat.scatter(1, att_idx[[edges[:, 0]]], 1)
+      att_edge_feat = att_edge_feat.scatter(
+          1, att_idx[[edges[:, 1]]] + self.att_edge_dim, 1)
+    
+     # BCN_max X H
+    
+    
+    # GNN inference
+    # N.B.: node_feat is shared by multiple subgraphs within the same batch
+    node_state = self.edge_decoder(
+        node_feat_edge[node_idx_feat], edges, edge_feat=att_edge_feat)
+   
+    
+    ### Pairwise predict edges
+    diff = node_state[node_idx_gnn[:, 0], :] - node_state[node_idx_gnn[:, 1], :]
+    
+
+    diff = diff * alpha_condition[node_idx_feat]
+    diff = diff + beta_condition[node_idx_feat]
+    
+    node_state = self.spline_conv(node_feat_label, edges.t(), pseudo_coordinates)
+#    node_state = self.node_decoder(
+#        node_feat_label, edges, edge_feat=att_edge_feat)
+    
+
+    node_state = node_state * alpha_condition
+    node_state = node_state + beta_condition
+
+    pred_node_labels = self.node_predictor(node_state.view(B * C, N_max, self.hidden_dim))
+
+    log_theta = self.output_theta(diff.view(-1, 16, 16))  # B X (tt+K)K
+    log_alpha = self.output_alpha(diff.view(-1, 16, 16))  # B X (tt+K)K
+    
+    log_theta = log_theta.view(-1, self.num_mix_component)  # B X CN(N-1)/2 X K
+    log_alpha = log_alpha.view(-1, self.num_mix_component)  # B X CN(N-1)/2 X K
+
+    return log_theta, log_alpha, torch.transpose(pred_node_labels, 2, 1)
+
+
+  def _sampling(self, B, conditional_data, expanded_search=False):
+    """ generate adj in row-wise auto-regressive fashion """
+    with torch.no_grad():       
+        K = self.block_size
+        S = self.sample_stride
+        H = self.hidden_dim
+        N = self.max_num_nodes
+        conditional_features = self.conditional_feature_extractor(conditional_data)
+        alpha_condition = self.condition_alpha(conditional_features)
+        beta_condition = self.condition_beta(conditional_features)
+        alpha_condition = alpha_condition.reshape(B * N, self.hidden_dim)
+        beta_condition = beta_condition.reshape(B * N, self.hidden_dim)
+        
+        mod_val = (N - K) % S
+        if mod_val > 0:
+          N_pad = N - K - mod_val + int(np.ceil((K + mod_val) / S)) * S
+        else:
+          N_pad = N
+
+        A = torch.zeros(B, N_pad, N_pad).to(self.device)
+        dim_input = self.embedding_dim if self.dimension_reduce else self.max_num_nodes
+
+        ### cache node state for speed up
+        node_state = torch.zeros(B, N_pad, dim_input).to(self.device)
+        node_list = torch.zeros(B, N_pad).to(self.device)
+        for ii in range(0, N_pad, S):
+          jj = ii + K
+          if jj > N_pad:
+            break
+
+          # reset to discard overlap generation
+          A[:, ii:, :] = .0
+          A = torch.tril(A, diagonal=-1)
+
+          if ii >= K:
+            if self.dimension_reduce:
+              node_state[:, ii - K:ii, :] = self.decoder_edge_input(A[:, ii - K:ii, :N])
+            else:
+              node_state[:, ii - K:ii, :] = A[:, ii - S:ii, :N]
+          else:
+            if self.dimension_reduce:
+              node_state[:, :ii, :] = self.decoder_edge_input(A[:, :ii, :N])
+            else:
+              node_state[:, :ii, :] = A[:, ii - S:ii, :N]
+
+          node_state_in = F.pad(
+              node_state[:, :ii, :], (0, 0, 0, K), 'constant', value=.0)
+
+          ### GNN propagation
+          adj = F.pad(
+              A[:, :ii, :ii], (0, K, 0, K), 'constant', value=1.0)  # B X jj X jj
+          adj = torch.tril(adj, diagonal=-1)
+          adj = adj + adj.transpose(1, 2)
+          edges = [
+              adj[bb].to_sparse().coalesce().indices() + bb * adj.shape[1]
+              for bb in range(B)
+          ]
+          
+          edges = torch.cat(edges, dim=1).t()
+
+          att_idx = torch.cat([torch.zeros(ii).long(),
+                               torch.arange(1, K + 1)]).to(self.device)
+          att_idx = att_idx.view(1, -1).expand(B, -1).contiguous().view(-1, 1)
+
+          if self.has_rand_feat:
+            # create random feature
+            att_edge_feat = torch.zeros(edges.shape[0],
+                                        2 * self.att_edge_dim).to(self.device)
+            idx_new_node = (att_idx[[edges[:, 0]]] >
+                            0).long() + (att_idx[[edges[:, 1]]] > 0).long()
+            idx_new_node = idx_new_node.bool().squeeze()
+            att_edge_feat[idx_new_node, :] = torch.randn(
+                    idx_new_node.long().sum(), att_edge_feat.shape[1]).to(self.device)
+            if expanded_search:
+                att_edge_feat[idx_new_node, :] = torch.randn(
+                    idx_new_node.long().sum(), att_edge_feat.shape[1]).to(self.device)
+##                sum_node_features = torch.sum(node_state_in.view(-1, H), axis=0)
+#            else:
+##              new_sample = torch.zeros(torch.Size([idx_new_node.long().sum()]))
+##              for index in range(idx_new_node.long().sum()):
+##                  
+##                  epsilon = torch.randn_like(self.logstd).to(self.device)
+##                  #for search epsilon is important
+##                  att_edge_feat[index, :] = self.mu * conditional_features  + torch.exp(self.logstd) * epsilon
+##                  [idx_new_node, :] = new_sample
+##                sum_node_features = torch.mean(node_state_in.view(-1, H), axis=0)
+##                sample_mean = self.mu(sum_node_features)
+##                sample_std = self.logstd(sum_node_features)
+##                target_shape = torch.Size((idx_new_node.long().sum(), att_edge_feat.shape[1]))
+##                
+#                att_edge_feat[idx_new_node, :] = self.get_sample(self.mu.squeeze(), 
+#                    self.logstd.squeeze(), 
+#                    torch.Size([idx_new_node.long().sum()]), train=False).to(node_state_in.device)
+#                att_edge_feat[idx_new_node, :] = self.get_sample(self.mu, self.logstd, 
+#                       target_shape).to(node_state_in.device)
+          else:
+            # create one-hot feature
+            att_edge_feat = torch.zeros(edges.shape[0],
+                                        2 * self.att_edge_dim).to(self.device)
+            att_edge_feat = att_edge_feat.scatter(1, att_idx[[edges[:, 0]]], 1)
+            att_edge_feat = att_edge_feat.scatter(
+                1, att_idx[[edges[:, 1]]] + self.att_edge_dim, 1)
+
+          node_state_out = self.edge_decoder(
+              node_state_in.view(-1, H), edges, edge_feat=att_edge_feat)
+          node_state_out = node_state_out.view(B, jj, -1)
+
+          idx_row, idx_col = np.meshgrid(np.arange(ii, jj), np.arange(jj))
+          idx_row = torch.from_numpy(idx_row.reshape(-1)).long().to(self.device)
+          idx_col = torch.from_numpy(idx_col.reshape(-1)).long().to(self.device)
+
+          diff = node_state_out[:,idx_row, :] - node_state_out[:,idx_col, :]  # B X (ii+K)K X H
+
+          node_idx_feat = get_node_idx_feat(ii, N, B)
+
+          diff = diff * alpha_condition[node_idx_feat].view(B, -1, self.hidden_dim)
+          diff = diff + beta_condition[node_idx_feat].view(B, -1, self.hidden_dim)
+          
+          log_theta = self.output_theta(diff.view(-1, 16, 16))
+          log_alpha = self.output_alpha(diff.view(-1, 16, 16))
+
+          log_theta = log_theta.view(B, -1, K, self.num_mix_component)  # B X K X (ii+K) X L
+          log_theta = log_theta.transpose(1, 2)  # B X (ii+K) X K X L
+
+          log_alpha = log_alpha.view(B, -1, self.num_mix_component)  # B X K X (ii+K)
+          prob_alpha = F.softmax(log_alpha.mean(dim=1), -1)
+          alpha = torch.multinomial(prob_alpha, 1).squeeze(dim=1).long()
+
+          prob = []
+          for bb in range(B):
+            prob += [torch.sigmoid(log_theta[bb, :, :, alpha[bb]])]
+
+          prob = torch.stack(prob, dim=0)
+          if jj <= N_pad:
+            A[:, ii:jj, :jj] = torch.bernoulli(prob[:, :jj - ii, :])
+
+        ### make it symmetric
+        if self.is_sym:
+          A = torch.tril(A, diagonal=-1)
+          A = A + A.transpose(1, 2)
+
+        A_pad = A.view(B, N, -1)
+
+        # print(A_pad.shape)
+        node_feat = self.decoder_node_input(A_pad).view(B * N, -1)
+
+
+        adj = A
+        adj = torch.tril(adj, diagonal=-1)
+        adj = adj + adj.transpose(1, 2)
+        edges = [
+            adj[bb].to_sparse().coalesce().indices()
+            for bb in range(B)
+        ]
+
+
+        graphs = [nx.from_numpy_array(adj[i].cpu().numpy()) for i in range(B) ]
+
+        pseudo_coordinates = list()
+        
+        for graph_index in range(len(graphs)):
+            pseudo_coordinates.append(np.array([[1/np.sqrt(graphs[graph_index].degree()[i]), 
+                                          1/np.sqrt(graphs[graph_index].degree()[j])] 
+                                  for i, j in edges[graph_index].t().cpu().tolist()]))
+          
+        batch_pseudo_coordinates = list()
+        for bb in range(len(pseudo_coordinates)):
+            if pseudo_coordinates[bb].shape[0] > 0:
+                  batch_pseudo_coordinates.append(pseudo_coordinates[bb])
+        if len(batch_pseudo_coordinates) == 0:
+            pseudo_coordinates = torch.empty(edges.t().shape[1], 2).float().to(self.device)
+        else:
+            pseudo_coordinates = torch.from_numpy(
+                np.concatenate(batch_pseudo_coordinates)).float().to(self.device)
+            
+
+
+        edges = [
+            adj[bb].to_sparse().coalesce().indices() + bb * adj.shape[1]
+            for bb in range(B)
+        ]
+
+        edges = torch.cat(edges, dim=1).t()
+        
+        att_idx = torch.cat([torch.zeros(ii).long(),
+                             torch.arange(1, K + 1)]).to(self.device)
+        att_idx = att_idx.view(1, -1).expand(B, -1).contiguous().view(-1, 1)
+
+        att_edge_feat = torch.zeros(edges.shape[0],
+                                    2 * self.att_edge_dim).to(self.device)
+        idx_new_node = (att_idx[[edges[:, 0]]] >
+                        0).long() + (att_idx[[edges[:, 1]]] > 0).long()
+        idx_new_node = idx_new_node.bool().squeeze()
+        att_edge_feat[idx_new_node, :] = torch.randn(
+            idx_new_node.long().sum(), att_edge_feat.shape[1]).to(self.device)
+        
+        node_state = self.spline_conv(node_feat, edges.t(), pseudo_coordinates)
+        
+        node_state = node_state * alpha_condition.view(B * N, self.hidden_dim)
+
+        node_state = node_state + beta_condition.view(B * N, self.hidden_dim)
+
+        pred_node_labels = self.node_predictor(node_state.view(B, N, self.hidden_dim))
+
+
+        node_list = torch.argmax(F.softmax(pred_node_labels, dim=-1), dim=-1)
+#        A.testing
+        return A, node_list.long()
+
+  def forward(self, input_dict):
+    """
+      B: batch size
+      N: number of rows/columns in mini-batch
+      N_max: number of max number of rows/columns
+      M: number of augmented edges in mini-batch
+      H: input dimension of GNN
+      K: block size
+      E: number of edges in mini-batch
+      S: stride
+      C: number of canonical orderings
+      D: number of mixture Bernoulli
+
+      Args:
+        A_pad: B X C X N_max X N_max, padded adjacency matrix
+        node_idx_gnn: M X 2, node indices of augmented edges
+        node_idx_feat: N X 1, node indices of subgraphs for indexing from feature
+                      (0 indicates indexing from 0-th row of feature which is
+                        always zero and corresponds to newly generated nodes)
+        att_idx: N X 1, one-hot encoding of newly generated nodes
+                      (0 indicates existing nodes, 1-D indicates new nodes in
+                        the to-be-generated block)
+        subgraph_idx: E X 1, indices corresponding to augmented edges
+                      (representing which subgraph in mini-batch the augmented
+                      edge belongs to)
+        edges: E X 2, edge as [incoming node index, outgoing node index]
+        label: E X 1, binary label of augmented edges
+        num_nodes_pmf: N_max, empirical probability mass function of number of nodes
+
+      Returns:
+        loss                        if training
+        list of adjacency matrices  else
+    """
+    is_sampling = input_dict[
+        'is_sampling'] if 'is_sampling' in input_dict else False
+    batch_size = input_dict[
+        'batch_size'] if 'batch_size' in input_dict else None
+    A_pad = input_dict['adj'] if 'adj' in input_dict else None
+    node_idx_gnn = input_dict[
+        'node_idx_gnn'] if 'node_idx_gnn' in input_dict else None
+    node_idx_feat = input_dict[
+        'node_idx_feat'] if 'node_idx_feat' in input_dict else None
+    att_idx = input_dict['att_idx'] if 'att_idx' in input_dict else None
+    subgraph_idx = input_dict[
+        'subgraph_idx'] if 'subgraph_idx' in input_dict else None
+    edges = input_dict['edges'] if 'edges' in input_dict else None
+    label = input_dict['label'] if 'label' in input_dict else None
+    num_nodes_pmf = input_dict[
+        'num_nodes_pmf'] if 'num_nodes_pmf' in input_dict else None
+    subgraph_idx_base = input_dict[
+        "subgraph_idx_base"] if "subgraph_idx_base" in input_dict else None
+    node_labels = input_dict[
+        "node_labels"] if "node_labels" in input_dict else None
+    pseudo_coordinates = input_dict[
+        "pseudo_coordinates"] if "pseudo_coordinates" in input_dict else None
+    conditional_data = input_dict[
+        "conditional_data"] if "conditional_data" in input_dict else None
+    expanded_search = input_dict[
+        "expanded_search"] if "expanded_search" in input_dict else None
+
+    if not is_sampling:
+      B, C, N, _ = A_pad.shape
+
+      ### compute adj loss
+      log_theta, log_alpha, pred_node_labels = self._inference(
+          A_pad=A_pad,
+          edges=edges,
+          node_idx_gnn=node_idx_gnn,
+          node_idx_feat=node_idx_feat,
+          att_idx=att_idx,
+          pseudo_coordinates=pseudo_coordinates,
+          conditional_data=conditional_data,
+          random_search=False)
+
+
+
+      adj_loss = mixture_bernoulli_loss(label, log_theta, log_alpha,
+                                        self.adj_loss_func, subgraph_idx, subgraph_idx_base,
+                                        self.num_canonical_order).mean()
+
+
+
+      adj_loss += self.label_loss(pred_node_labels, node_labels)
+      return adj_loss, torch.argmax(F.softmax(torch.transpose(pred_node_labels, 2, 1), dim=-1), dim=-1), node_labels
+
+    else:
+      A, graphs_node_list = self._sampling(batch_size, conditional_data, expanded_search)
+
+      ### sample number of nodes
+      num_nodes_pmf = torch.from_numpy(num_nodes_pmf).to(self.device)
+      num_nodes = torch.multinomial(
+          num_nodes_pmf, batch_size, replacement=True) + 1  # shape B X 1
+      A_list = [
+          A[ii, :num_nodes[ii], :num_nodes[ii]] for ii in range(batch_size)
+      ]
+
+      return A_list, graphs_node_list
 
 def get_node_idx_feat(node_idx, max_num_nodes, batch_size):
     K = 1

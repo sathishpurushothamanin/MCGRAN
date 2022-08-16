@@ -65,8 +65,8 @@ except:
 
 
 # Use nasbench_full.tfrecord for full dataset (run download command above).
-#filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
-#nasbench = api.NASBench(filepath, seed = 1234)
+filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
+nasbench = api.NASBench(filepath, seed = 1234)
     
 logger = get_logger('exp_logger')
 __all__ = ['GranRunner_Higher_Order_Search', 'compute_edge_ratio', 'get_graph', 'evaluate']
