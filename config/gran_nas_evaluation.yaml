@@ -69,5 +69,5 @@ test:
   vis_num_row: 1 # visualize `num_vis` samples in `vis_num_row` rows
   better_vis: true
   generated_graph_data_dir: generated_data
-  test_model_dir: exp/EVALUATION/20993
-  test_model_name: model_snapshot_0000268.pth
+  test_model_dir: exp/EVALUATION/21883
+  test_model_name: model_snapshot_0000281.pth

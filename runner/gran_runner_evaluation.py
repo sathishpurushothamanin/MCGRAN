@@ -605,8 +605,8 @@ class GranRunner_Evaluation(object):
     structure_evaluation_metrics['spectral'] = mmd_spectral_dev
     
     pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
-      pickle.dump(self.test_accuracy_train, open(os.path.join(self.config.save_dir, 'test_accuracy_train.p'), 'wb'))
-      pickle.dump(self.test_accuracy_test, open(os.path.join(self.config.save_dir, 'test_accuracy_test.p'), 'wb'))
+    pickle.dump(self.test_accuracy_train, open(os.path.join(self.config.save_dir, 'test_accuracy_train.p'), 'wb'))
+    pickle.dump(self.test_accuracy_test, open(os.path.join(self.config.save_dir, 'test_accuracy_test.p'), 'wb'))
       
     ## Evaluate Generated Graphs
     structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
