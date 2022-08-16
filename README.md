@@ -36,9 +36,9 @@ Other dependencies can be installed via
 ## Run Demos
 
 ### Train
-* To run the training of experiment ```X``` where ```X``` is one of {```gran_grid```, ```gran_DD```, ```gran_DB```, ```gran_lobster```}:
+* To run the training of experiment ```X``` where ```X``` is one of {```gran_nas_evaluation.yaml```, ```gran_DD```, ```gran_DB```, ```gran_lobster```}:
 
-  ```python run_exp.py -c config/gran_nas_evaluation.yaml.yaml```
+  ```python run_exp.py -c config/X -t```
 
 
 **Note**:
@@ -54,7 +54,7 @@ Other dependencies can be installed via
 
 * To run the test of experiments ```X```:
 
-  ```python run_exp.py -c config/gran_nas_evaluation.yaml -t```
+  ```python run_exp.py -c config/X -e```
 
 **Note**:
 
@@ -66,10 +66,6 @@ We also compute the orbit counts for each graph, represented as a high-dimension
     
 in directory eval/orca. (the binary file already in repo works in Ubuntu).
 
-### Trained Models
-* You could use our trained model for comparisons. Please make sure you are using the same split of the dataset. Running the following script will download the trained model:
-
-	```./download_model.sh```
 
 ## Sampled Graphs from GRAN
 

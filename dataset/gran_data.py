@@ -14,7 +14,7 @@ from sklearn import preprocessing
 
 class GRANData_Node_Level(object):
 
-  def __init__(self, config, graphs, total_parameters, total_training_time,  test_accuracy, supernode_categories=None, tag='train'):
+  def __init__(self, config, graphs, total_parameters, total_training_time,  test_accuracy, tag='train'):
     self.config = config
     self.data_path = config.dataset.data_path
     self.model_name = config.model.name
@@ -64,7 +64,6 @@ class GRANData_Node_Level(object):
         nn_data_item['parameters'] = [total_parameters[index]]
         nn_data_item['training_time'] = [total_training_time[index]]
         nn_data_item['test_accuracy'] = [test_accuracy[index]]
-#        nn_data_item['supernode_categories'] = [supernode_categories[index]]
         tmp_path = os.path.join(self.save_path, '{}_{}_a.p'.format(tag, index))
         tmp_path_label = os.path.join(self.save_path, '{}_{}_l.p'.format(tag, index))
         tmp_path_conditional_data = os.path.join(self.save_path, '{}_{}_c.p'.format(tag, index))
@@ -345,7 +344,6 @@ class GRANData_Node_Level(object):
       data['parameters'] = np.array(conditional_data['parameters'])
       data['training_time'] = np.array(conditional_data['training_time'])
       data['test_accuracy'] = np.array(conditional_data['test_accuracy'])
-#      data['supernode_categories'] = np.concatenate(conditional_data['supernode_categories'], axis=0)
       data_batch += [data]
 
 #    end_time = time.time()
@@ -358,7 +356,6 @@ class GRANData_Node_Level(object):
   def collate_fn(self, batch):
     assert isinstance(batch, list)
 #    start_time = time.time()
-#    batch_size = len(batch)
     N = self.max_num_nodes
     C = self.num_canonical_order
     batch_data = []
@@ -455,14 +452,7 @@ class GRANData_Node_Level(object):
       test_accuracy = binarizer.transform(test_accuracy)
       data['conditional_data'] = torch.from_numpy(np.column_stack((#node_degree,
               parameters, training_time, test_accuracy))).float()
-      
-#      if self.config.model.tree_level ==  0:
-#          data['conditional_data'] = torch.from_numpy(np.vstack([bb['supernode_categories'] for bb in batch_pass])).float()    
-#      else:   
-#          data['conditional_data'] = torch.from_numpy(np.column_stack((#node_degree,
-#              parameters, training_time, test_accuracy))).float()
-
-      
+            
       batch_data += [data]
 
 #    end_time = time.time()
@@ -911,8 +901,8 @@ class GRANData_Search(object):
       test_accuracy = np.stack([bb['test_accuracy'] for bb in batch_pass])
       binarizer = preprocessing.Binarizer(threshold=self.test_accuracy_threshold)
       test_accuracy = binarizer.transform(test_accuracy)
-      data['conditional_data'] = torch.from_numpy(np.column_stack((#node_degree,
-              parameters, training_time, test_accuracy))).float()
+#      data['conditional_data'] = torch.from_numpy(np.column_stack((#node_degree,
+#              parameters, training_time, test_accuracy))).float()
       
       if self.config.model.tree_level ==  0:
           data['conditional_data'] = torch.from_numpy(np.vstack([bb['supernode_categories'] for bb in batch_pass])).float()    
