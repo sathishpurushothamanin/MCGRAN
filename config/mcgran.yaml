@@ -1,6 +1,6 @@
 ---
-exp_name: EVALUATION
-exp_dir: exp/EVALUATION
+exp_name: MCGRAN
+exp_dir: exp/MCGRAN
 runner: GranRunner_Evaluation
 use_horovod: false
 use_gpu: true
@@ -23,9 +23,9 @@ dataset:
   has_node_feat: false
   is_save_split: true
   is_sample_subgraph: true # set to true if you want to sample subgraphs
-  is_overwrite_precompute: true
+  is_overwrite_precompute: false
 model:
-  name: GRANMixtureBernoulli_Evaluation
+  name: MCGRAN
   num_mix_component: 64
   is_sym: false
   block_size: 1
@@ -59,9 +59,9 @@ train:
   resume_dir: # exp/GRAN/your_exp_folder
   resume_model: #model_snapshot_0005000.pth
 test:
-  batch_size: 10
+  batch_size:20
   num_workers: 0
-  num_test_gen: 10 # number of generated samples
+  num_test_gen: 20 # number of generated samples
   is_vis: true
   is_single_plot: false # visualize `num_vis` samples in a single image
   is_test_ER: false # test Erdos-Renyi baseline
@@ -69,5 +69,5 @@ test:
   vis_num_row: 1 # visualize `num_vis` samples in `vis_num_row` rows
   better_vis: true
   generated_graph_data_dir: generated_data
-  test_model_dir: exp/EVALUATION/21883
-  test_model_name: model_snapshot_0000281.pth
+  test_model_dir: exp/MCGRAN/45521
+  test_model_name: model_snapshot_0000298.pth

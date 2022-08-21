@@ -259,11 +259,7 @@ class GRANMixtureBernoulli_Evaluation(nn.Module):
     self.has_rand_feat = True # use random feature instead of 1-of-K encoding
     self.att_edge_dim = config.model.hidden_dim // 2 #128
     self.num_conditional_features = 3 #self.config.num_categories
-#    self.class_weights = torch.tensor([1/self.config.class_weights[0],
-#        1/self.config.class_weights[1],
-#        1/self.config.class_weights[2],
-#        1/self.config.class_weights[3],
-#        1/self.config.class_weights[4]]).to(self.device)
+
 
     self.node_predictor = nn.Sequential(
         nn.Linear(self.hidden_dim, self.hidden_dim),
@@ -350,7 +346,6 @@ class GRANMixtureBernoulli_Evaluation(nn.Module):
         pos_weight=pos_weight, reduction='none')
 
     self.softmax = nn.LogSoftmax(dim=-1)
-#    self.label_loss = nn.CrossEntropyLoss(weight=self.class_weights, reduction='mean')
     self.label_loss = nn.CrossEntropyLoss()
 
   def get_sample(self, mu, logstd, target_shape, train = True):
@@ -415,26 +410,6 @@ class GRANMixtureBernoulli_Evaluation(nn.Module):
       att_edge_feat[idx_new_node, :] = torch.randn(
               idx_new_node.long().sum(),
               att_edge_feat.shape[1]).to(node_feat_edge.device)
-#      if random_search:
-#          att_edge_feat[idx_new_node, :] = torch.randn(
-#              idx_new_node.long().sum(),
-#              att_edge_feat.shape[1]).to(node_feat_edge.device)
-#      else:
-##          new_sample = torch.zeros(torch.Size([idx_new_node.long().sum()]))
-#          for index in range(idx_new_node.long().sum()):
-#              
-#              epsilon = torch.randn_like(self.logstd).to(node_feat_edge.device)
-#              #for search epsilon is important
-#              att_edge_feat[index, :] = self.mu + torch.exp(self.logstd) * epsilon
-#          att_edge_feat[idx_new_node, :] = new_sample
-#          sum_node_features = torch.mean(node_feat_edge, axis=0)
-#          sample_mean = self.mu(sum_node_features)
-#          sample_std = self.logstd(sum_node_features)
-#          target_shape = torch.Size([idx_new_node.long().sum()])
-#          att_edge_feat[idx_new_node, :] = self.get_sample(sample_mean, sample_std, 
-#                       target_shape, train=True).to(node_feat_edge.device)
-#          att_edge_feat[idx_new_node, :] = self.get_sample(self.mu, self.logstd, 
-#                       target_shape).to(node_feat_edge.device)
     else:
       # create one-hot feature
       att_edge_feat = torch.zeros(edges.shape[0],
@@ -552,28 +527,6 @@ class GRANMixtureBernoulli_Evaluation(nn.Module):
             idx_new_node = idx_new_node.bool().squeeze()
             att_edge_feat[idx_new_node, :] = torch.randn(
                     idx_new_node.long().sum(), att_edge_feat.shape[1]).to(self.device)
-#            if expanded_search:
-#                att_edge_feat[idx_new_node, :] = torch.randn(
-#                    idx_new_node.long().sum(), att_edge_feat.shape[1]).to(self.device)
-##                sum_node_features = torch.sum(node_state_in.view(-1, H), axis=0)
-#            else:
-##              new_sample = torch.zeros(torch.Size([idx_new_node.long().sum()]))
-##              for index in range(idx_new_node.long().sum()):
-##                  
-##                  epsilon = torch.randn_like(self.logstd).to(self.device)
-##                  #for search epsilon is important
-##                  att_edge_feat[index, :] = self.mu * conditional_features  + torch.exp(self.logstd) * epsilon
-##                  [idx_new_node, :] = new_sample
-##                sum_node_features = torch.mean(node_state_in.view(-1, H), axis=0)
-##                sample_mean = self.mu(sum_node_features)
-##                sample_std = self.logstd(sum_node_features)
-##                target_shape = torch.Size((idx_new_node.long().sum(), att_edge_feat.shape[1]))
-##                
-#                att_edge_feat[idx_new_node, :] = self.get_sample(self.mu.squeeze(), 
-#                    self.logstd.squeeze(), 
-#                    torch.Size([idx_new_node.long().sum()]), train=False).to(node_state_in.device)
-#                att_edge_feat[idx_new_node, :] = self.get_sample(self.mu, self.logstd, 
-#                       target_shape).to(node_state_in.device)
           else:
             # create one-hot feature
             att_edge_feat = torch.zeros(edges.shape[0],
@@ -810,11 +763,6 @@ class GRANMixtureBernoulli_HOS(nn.Module):
     self.has_rand_feat = True # use random feature instead of 1-of-K encoding
     self.att_edge_dim = config.model.hidden_dim // 2 #128
     self.num_conditional_features = self.config.num_categories
-#    self.class_weights = torch.tensor([1/self.config.class_weights[0],
-#        1/self.config.class_weights[1],
-#        1/self.config.class_weights[2],
-#        1/self.config.class_weights[3],
-#        1/self.config.class_weights[4]]).to(self.device)
 
     self.node_predictor = nn.Sequential(
         nn.Linear(self.hidden_dim, self.hidden_dim),

@@ -65,8 +65,8 @@ except:
 
 
 # Use nasbench_full.tfrecord for full dataset (run download command above).
-filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
-nasbench = api.NASBench(filepath, seed = 1234)
+#filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
+#nasbench = api.NASBench(filepath, seed = 1234)
     
 logger = get_logger('exp_logger')
 __all__ = ['GranRunner_Higher_Order_Search', 'compute_edge_ratio', 'get_graph', 'evaluate']
@@ -177,25 +177,6 @@ class GranRunner_Higher_Order_Search(object):
     self.search_train_stats = list()
     self.search_gen_stats = list()
 
-#    training_ds_operations_freq = dict()
-#    for G in self.graphs_train:
-#        for layer in [node['label'] for idx, node in G.nodes.data()]:
-#            if layer in training_ds_operations_freq.keys():
-#                training_ds_operations_freq[layer] +=1
-#            else:
-#                training_ds_operations_freq[layer] = 1
-#    for index in range(5):
-#        if index not in training_ds_operations_freq.keys():
-#            training_ds_operations_freq[index] = 0.0001
-#    self.class_weights = [training_ds_operations_freq[0],
-#        training_ds_operations_freq[1],
-#        training_ds_operations_freq[2],
-#        training_ds_operations_freq[3],
-#        training_ds_operations_freq[4]]
-#
-#    self.config.class_weights = self.class_weights
-
-
 
     self.config.dataset.sparse_ratio = compute_edge_ratio(self.graphs_train)
     logger.info('No Edges vs. Edges in training set = {}'.format(
@@ -237,15 +218,6 @@ class GranRunner_Higher_Order_Search(object):
         num_workers=self.train_conf.num_workers,
         collate_fn=train_dataset.collate_fn,
         drop_last=False)
-#
-#    val_dataset = eval(self.dataset_conf.loader_name)(self.config, self.graphs_dev, self.total_parameters_dev, self.total_training_time_dev, self.test_accuracy_dev, tag='dev_{}'.format(self.config.model.max_num_nodes))
-#    val_loader = torch.utils.data.DataLoader(
-#        val_dataset,
-#        batch_size=self.train_conf.batch_size,
-#        shuffle=self.train_conf.shuffle,
-#        num_workers=self.train_conf.num_workers,
-#        collate_fn=train_dataset.collate_fn,
-#        drop_last=False)
 
     # create models
     model = eval(self.model_conf.name)(self.config)
@@ -352,78 +324,13 @@ class GranRunner_Higher_Order_Search(object):
         clip_grad_norm_(model.parameters(), 5.0e-0)
         optimizer.step()
         avg_train_loss /= float(self.dataset_conf.num_fwd_pass)
-#        avg_train_acc /= float(self.dataset_conf.num_fwd_pass)
-#        if epoch == 10:
-#          print(train_loss.testing)
+
         # reduce
         train_loss = float(avg_train_loss.data.cpu().numpy())
       classifier_train_metrics = validation_metrics(pred_label = pred_label_list, actual_label = actual_label_list)
       if iter_count % self.train_conf.display_iter == 0 or iter_count == 1:
         logger.info("Training Loss @ epoch {:04d}; Loss: {:.4f}; Accuracy: {:.4f}; Precision: {:.4f}; Recall: {:.4f}; F1 Score: {:.4f}".format(epoch + 1, train_loss, classifier_train_metrics['accuracy'], classifier_train_metrics['precision'], classifier_train_metrics['recall'], classifier_train_metrics['f1_score']))
-#      if epoch % 1 == 0:
-#        model.eval()
-#        with torch.no_grad():
-#          val_iterator = val_loader.__iter__()
-#          pred_label_list = list()
-#          actual_label_list = list()
-#          for inner_iter in range(len(val_loader) // self.num_gpus):
-#            batch_data = []
-#            if self.use_gpu:
-#              for _ in self.gpus:
-#                data = val_iterator.next()
-#                batch_data.append(data)
-#                iter_count += 1
-#
-#
-#            avg_val_loss = .0
-##            avg_val_acc = .0
-#            for ff in range(self.dataset_conf.num_fwd_pass):
-#              batch_fwd = []
-#
-#              if self.use_gpu:
-#                for dd, gpu_id in enumerate(self.gpus):
-#                  data = {}
-#                  data['adj'] = batch_data[dd][ff]['adj'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['edges'] = batch_data[dd][ff]['edges'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['node_idx_gnn'] = batch_data[dd][ff]['node_idx_gnn'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['node_idx_feat'] = batch_data[dd][ff]['node_idx_feat'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['label'] = batch_data[dd][ff]['label'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['att_idx'] = batch_data[dd][ff]['att_idx'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['subgraph_idx'] = batch_data[dd][ff]['subgraph_idx'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['subgraph_idx_base'] = batch_data[dd][ff]['subgraph_idx_base'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['node_labels'] = batch_data[dd][ff]['node_labels'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['pseudo_coordinates'] = batch_data[dd][ff]['pseudo_coordinates'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['conditional_data'] = batch_data[dd][ff]['conditional_data'].pin_memory().to(gpu_id, non_blocking=True)
-#                  batch_fwd.append((data,))
-#              if batch_fwd:
-#                val_loss, pred_label, actual_label = model(*batch_fwd)
-#                pred_label = pred_label.cpu().tolist()
-#                actual_label = actual_label.cpu().tolist()
-#                for index in range(len(pred_label)):
-#                  pred_label_list.extend(pred_label[index])
-#                  actual_label_list.extend(actual_label[index])
-#
-#                avg_val_loss += val_loss
-##                avg_val_acc += val_acc
-#
-#                # assign gradient
-#            avg_val_loss /= float(self.dataset_conf.num_fwd_pass)
-##            avg_val_acc /= float(self.dataset_conf.num_fwd_pass)
-#
-#            # reduce
-#            val_loss = float(avg_val_loss.data.cpu().numpy())
-##            val_acc = float(avg_val_acc.data.cpu().numpy())
-#
-#        classifier_validation_metrics = validation_metrics(pred_label = pred_label_list, actual_label = actual_label_list)
-#        if iter_count % self.train_conf.display_iter == 0 or iter_count == 1:
-#          logger.info("Validation Loss @ epoch {:04d}; Loss: {:.4f}; Accuracy: {:.4f}; Precision: {:.4f}; Recall: {:.4f}; F1 Score: {:.4f}".format(epoch + 1, val_loss, classifier_validation_metrics['accuracy'], classifier_validation_metrics['precision'], classifier_validation_metrics['recall'], classifier_validation_metrics['f1_score']))
 
-#      self.writer.add_scalar('train_loss', train_loss, epoch)
-#      self.writer.add_scalar('train_acc', classifier_train_metrics['accuracy'], epoch)
-#      self.writer.add_scalar('train_f1_score', classifier_train_metrics['f1_score'], epoch)
-#      self.writer.add_scalar('val_loss', val_loss, epoch)
-#      self.writer.add_scalar('val_acc', classifier_validation_metrics['accuracy'], epoch)
-#      self.writer.add_scalar('val_f1_score', classifier_validation_metrics['f1_score'], epoch)
     
       results['train_loss'] += [train_loss]
       results['train_acc'] += [classifier_train_metrics['accuracy']]
@@ -434,10 +341,6 @@ class GranRunner_Higher_Order_Search(object):
       results['train_step'] += [iter_count]
       
       print("Training Loss @ epoch {:04d}; Loss: {:.4f}; Accuracy: {:.4f}; Precision: {:.4f}; Recall: {:.4f}; F1 Score: {:.4f}".format(epoch + 1, train_loss, classifier_train_metrics['accuracy'], classifier_train_metrics['precision'], classifier_train_metrics['recall'], classifier_train_metrics['f1_score']))
-#      print("Validation Loss @ epoch {:04d}; Loss: {:.4f}; Accuracy: {:.4f}; Precision: {:.4f}; Recall: {:.4f}; F1 Score: {:.4f}".format(epoch + 1, val_loss, classifier_validation_metrics['accuracy'], classifier_validation_metrics['precision'], classifier_validation_metrics['recall'], classifier_validation_metrics['f1_score']))
-#      if epoch > 250 and classifier_validation_metrics['f1_score'] > best_f1_score:
-#          best_f1_score = classifier_validation_metrics['f1_score']
-#          snapshot(model.module if self.use_gpu else model, optimizer, self.config, epoch + 1, tag="search_{}".format(self.config.model.max_num_nodes), scheduler=lr_scheduler)
 
       if (epoch + 1) % self.train_conf.snapshot_epoch == 0:
         logger.info("Saving Snapshot @ epoch {:04d}".format(epoch + 1))
@@ -455,9 +358,7 @@ class GranRunner_Higher_Order_Search(object):
     ### load model
     model = eval(self.model_conf.name)(self.config)
     model_file = os.path.join(self.config.save_dir, "model_snapshot_search_{}_{}.pth".format(self.config.model.max_num_nodes, self.config.model.tree_level))
-    #to do
-    #modify test model name
-#    model_file = os.path.join(self.test_conf.test_model_dir, self.test_conf.test_model_name)
+
     load_model(model, model_file, self.device)
 
 
@@ -507,72 +408,7 @@ class GranRunner_Higher_Order_Search(object):
 
     logger.info('Average test time per mini-batch = {}'.format(
       np.mean(gen_run_time)))
-    
-#    conditional_data = list()
-#    test_dataset = eval(self.dataset_conf.loader_name)(self.config, 
-#                       self.graphs_test[:self.num_test_gen], 
-#                       self.total_parameters_test[:self.num_test_gen], 
-#                       self.total_training_time_test[:self.num_test_gen], 
-#                       self.test_accuracy_test[:self.num_test_gen], 
-#                       self.supernode_categories_test[:self.num_test_gen], 
-#                       tag='test')
-#    test_loader = torch.utils.data.DataLoader(
-#        test_dataset,
-#        batch_size=self.test_conf.batch_size,
-#        shuffle=False,
-#        num_workers=self.test_conf.num_workers,
-#        collate_fn=test_dataset.collate_fn,
-#        drop_last=False)
-#    
-#    gen_run_time = []
-#    self.graphs_gen_nodes = []
-#    for ii in tqdm(range(num_test_batch)):
-#        test_iterator = test_loader.__iter__()
-#        batch_data = list()
-#        for inner_iter in range(len(test_loader) // self.num_gpus):
-#            batch_data = []
-#            if self.use_gpu:
-#              for _ in self.gpus:
-#                data = test_iterator.next()
-#                batch_data.append(data)
-#        
-#        for ff in range(self.dataset_conf.num_fwd_pass):
-#            batch_fwd = []
-#
-#            if self.use_gpu:
-#                for dd, gpu_id in enumerate(self.gpus):
-#                  data = {}
-#                  data['adj'] = batch_data[dd][ff]['adj'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['edges'] = batch_data[dd][ff]['edges'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['node_idx_gnn'] = batch_data[dd][ff]['node_idx_gnn'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['node_idx_feat'] = batch_data[dd][ff]['node_idx_feat'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['label'] = batch_data[dd][ff]['label'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['att_idx'] = batch_data[dd][ff]['att_idx'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['subgraph_idx'] = batch_data[dd][ff]['subgraph_idx'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['subgraph_idx_base'] = batch_data[dd][ff]['subgraph_idx_base'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['node_labels'] = batch_data[dd][ff]['node_labels'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['pseudo_coordinates'] = batch_data[dd][ff]['pseudo_coordinates'].pin_memory().to(gpu_id, non_blocking=True)
-#                  data['conditional_data'] = batch_data[dd][ff]['conditional_data'].pin_memory().to(gpu_id, non_blocking=True)
-#                  batch_fwd.append((data,))
-#        start_time = time.time()
-#        input_dict = {}
-#        input_dict['is_sampling']=True
-#        input_dict['batch_size']=self.test_conf.batch_size
-#        input_dict['num_nodes_pmf']=self.num_nodes_pmf_train
-#        input_dict['conditional_data'] = data['conditional_data']
-#        input_dict['expanded_search'] = False
-#        conditional_data.extend(data['conditional_data'].cpu().numpy().tolist())
-#        A_tmp, graphs_node_list = model(input_dict)
-##        gen_run_time += [time.time() - start_time]
-##        self.A_pred += [aa.data.cpu().numpy() for aa in A_tmp]
-##        num_nodes_pred += [aa.shape[0] for aa in A_tmp]
-#        gen_run_time += [time.time() - start_time]
-#        self.A_pred += [aa.data.cpu().numpy() for aa in A_tmp]
-#        num_nodes_pred += [aa.shape[0] for aa in A_tmp]
-#        self.graphs_gen_nodes.extend(graphs_node_list)
-#
-#    logger.info('Average test time per mini-batch = {}'.format(
-#      np.mean(gen_run_time)))
+ 
 
     node_label_list = self.graphs_gen_nodes
     self.valid_graphs = []
@@ -640,45 +476,13 @@ class GranRunner_Higher_Order_Search(object):
         print('Standard Deviation ', np.std(self.training_time_list))
         print('Maximum ', np.max(self.training_time_list))
         print('Minimum ', np.min(self.training_time_list))
-    ### Evaluate Generated Graphs
-#    structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
-#    
-#    logger.info("Test MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['test']['num_nodes'], 
-#                structure_evaluation_metrics['test']['node_degree'], 
-#                structure_evaluation_metrics['test']['node_clustering'], 
-#                structure_evaluation_metrics['test']['graph_4orbits'],
-#                structure_evaluation_metrics['test']['graph_spectral'],
-#                structure_evaluation_metrics['test']['NSPDK']))
-#    
-#    logger.info("Dev MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['dev']['num_nodes'], 
-#                structure_evaluation_metrics['dev']['node_degree'], 
-#                structure_evaluation_metrics['dev']['node_clustering'], 
-#                structure_evaluation_metrics['dev']['graph_4orbits'],
-#                structure_evaluation_metrics['dev']['graph_spectral'],
-#                structure_evaluation_metrics['test']['NSPDK']))
-#    
-#    logger.info("Generated Graphs #self-loops/isolated_nodes/invalid_nn are = {}/{}/{}".format(structure_evaluation_metrics['self_loops'],
-#                structure_evaluation_metrics['isolated_nodes'],
-#                structure_evaluation_metrics['invalid_nn']))
-#    
-#    logger.info("The uniqueness of the generated graphs:")
-#    for key in sorted(structure_evaluation_metrics['uniqueness']):
-#        logger.info("{}: {}".format(key, round(structure_evaluation_metrics['uniqueness'][key], 2)))
-#    
-#    logger.info("The novelty of the generated graphs:")
-#    for key in sorted(structure_evaluation_metrics['novelty']):
-#        logger.info("{}: {}".format(key, round(structure_evaluation_metrics['novelty'][key], 2)))
-#        
-#    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
-#    ### Visualize Generated Graphs
 
-#    visualize_graphs(self.config, self.A_pred, self.graphs_train)
 
   def targeted_search(self):
     
     #total_elapsed_time
     #loop
-    #to do
+
     #set model and data selection dynamically
     for _ in range(100):
         #exploit
@@ -733,8 +537,7 @@ class GranRunner_Higher_Order_Search(object):
     self.search_gen_stats = list()
     self.search_train_stats = list()
     self.accuracy_list = list()
-#    free_up_cache()
-#    print(self.config.model.max_num_nodes)
+
 #    print(self.config.model.max_num_nodes.test)
     self.all_datasets[self.config.model.tree_level].update({self.config.model.max_num_nodes: self.dataset})
     self.all_datasets[self.config.model.tree_level].update({self.config.model.max_num_nodes+1: self.expanded_dataset})

@@ -194,6 +194,7 @@ def create_graphs(graph_type, data_dir='data', max_num_samples=1000, min_test_ac
         graphs = []
         tf.compat.v1.enable_eager_execution()
         count = 1
+#        print(os.path.join(data_dir, filename), os.path.exists(os.path.join(data_dir, filename)))
         if os.path.exists(os.path.join(data_dir, filename)):
             dataset = tf.data.TFRecordDataset(os.path.join(data_dir, filename))
             operations = {'input':0, 'conv3x3-bn-relu':1, 'conv1x1-bn-relu':2, 'maxpool3x3':3, 'output':4}

@@ -28,7 +28,7 @@ from utils.dist_helper import compute_mmd, gaussian_emd, gaussian, emd, gaussian
 from nasbench import api
 
 # Use nasbench_full.tfrecord for full dataset (run download command above).
-nasbench = api.NASBench('data/nas-101/nasbench_only108.tfrecord')
+#nasbench = api.NASBench('data/nas-101/nasbench_only108.tfrecord')
 
 # Useful constants
 INPUT = 'input'

@@ -4,7 +4,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
-#import pydot
+import pydot
 
 def visualize_graphs(config, A_pred, graphs_train): 
     graphs_gen = A_pred #[nx.from_numpy_matrix(aa) for aa in A_pred]
