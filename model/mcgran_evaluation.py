@@ -301,20 +301,25 @@ class MCGRAN(nn.Module):
                                2, self.max_num_nodes).to(self.device)
 
     self.conditional_feature_extractor = nn.Sequential(
-          nn.Linear(self.num_conditional_features, self.hidden_dim))
+          nn.Linear(self.num_conditional_features, self.hidden_dim),
+          nn.BatchNorm1d(self.hidden_dim, self.hidden_dim))
     
     self.condition_alpha = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim)
+            nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim),
+            nn.BatchNorm1d(self.max_num_nodes*self.hidden_dim, self.hidden_dim)
             )
     self.condition_beta = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim)
+            nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim),
+            nn.BatchNorm1d(self.max_num_nodes*self.hidden_dim, self.hidden_dim)
             )
 
     self.node_alpha = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.hidden_dim)
+            nn.Linear(self.hidden_dim, self.hidden_dim),
+            nn.BatchNorm1d(self.hidden_dim, self.hidden_dim)
             )
     self.node_beta = nn.Sequential(
-            nn.Linear(self.hidden_dim, self.hidden_dim)
+            nn.Linear(self.hidden_dim, self.hidden_dim),
+            nn.BatchNorm1d(self.hidden_dim, self.hidden_dim)
             )
     
     self.node_normalize = nn.BatchNorm1d(self.hidden_dim)
@@ -353,6 +358,8 @@ class MCGRAN(nn.Module):
     pos_weight = torch.ones([1]) * self.edge_weight
     self.adj_loss_func = nn.BCEWithLogitsLoss(
         pos_weight=pos_weight, reduction='none')
+    
+#    self.adj_loss_func = nn.CrossEntropyLoss()
 
     self.softmax = nn.LogSoftmax(dim=-1)
     self.label_loss = nn.CrossEntropyLoss()
@@ -446,9 +453,14 @@ class MCGRAN(nn.Module):
     
     alpha_state = torch.zeros(node_state.shape).to(node_feat_edge.device)
     beta_state = torch.zeros(node_state.shape).to(node_feat_edge.device)
+    
+    alpha_condition = alpha_condition.reshape(B, N_max, self.hidden_dim)
+    beta_condition = beta_condition.reshape(B, N_max, self.hidden_dim)
+    
+    beta_state[:, 0, : ] = node_state[:, 0, : ] * alpha_condition[:, 0, :] +  beta_condition[:, 0, :]
     for node_idx in range(1, N_max):
-        alpha_state[:, node_idx, : ] = node_state[:, node_idx, :] * self.node_alpha(node_state[:, node_idx-1, :])
-        beta_state[:, node_idx, : ] = alpha_state[:, node_idx, : ] + node_state[:, node_idx, :] * self.node_beta(node_state[:, node_idx-1, :])
+        alpha_state[:, node_idx, : ] = node_state[:, node_idx, :] * self.node_alpha(node_state[:, node_idx-1, :]) * alpha_condition[:, node_idx, :]
+        beta_state[:, node_idx, : ] = alpha_state[:, node_idx, : ] +  self.node_beta(node_state[:, node_idx-1, :])  + beta_condition[:, node_idx, :]
         
 #    print(node_state.shape)
 #    print(alpha_condition.shape)
@@ -589,7 +601,6 @@ class MCGRAN(nn.Module):
 
         A_pad = A.view(B, N, -1)
 
-        # print(A_pad.shape)
         node_feat = self.decoder_node_input(A_pad).view(B * N, -1)
         
         
@@ -597,9 +608,13 @@ class MCGRAN(nn.Module):
 
         alpha_state = torch.zeros(node_state.shape).to(self.device)
         beta_state = torch.zeros(node_state.shape).to(self.device)
+        
+        alpha_condition = alpha_condition.reshape(B, N, self.hidden_dim)
+        beta_condition = beta_condition.reshape(B, N, self.hidden_dim)
+        beta_state[:, 0, : ] = node_state[:, 0, : ] * alpha_condition[:, 0, :] +  beta_condition[:, 0, :]
         for node_idx in range(1, N):
-            alpha_state[:, node_idx, : ] = node_state[:, node_idx, :] * self.node_alpha(node_state[:, node_idx-1, :])
-            beta_state[:, node_idx, : ] = alpha_state[:, node_idx, : ] + node_state[:, node_idx, :] * self.node_beta(node_state[:, node_idx-1, :])
+            alpha_state[:, node_idx, : ] = node_state[:, node_idx, :] * self.node_alpha(node_state[:, node_idx-1, :]) * alpha_condition[:, node_idx, :]
+            beta_state[:, node_idx, : ] = alpha_state[:, node_idx, : ] +  self.node_beta(node_state[:, node_idx-1, :])  + beta_condition[:, node_idx, :]
 
         node_state = self.node_normalize(beta_state.reshape(B * N, self.hidden_dim))
     

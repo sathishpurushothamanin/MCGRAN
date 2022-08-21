@@ -45,10 +45,10 @@ train:
   lr_decay: 0.1
   lr_decay_epoch: [100000000] # no decay
   num_workers: 0
-  max_epoch: 300
+  max_epoch: 30
   batch_size: 20
   display_iter: 10
-  snapshot_epoch: 300
+  snapshot_epoch: 30
   valid_epoch: 50
   lr: 1.0e-4
   wd: 0.0e-4
@@ -59,7 +59,7 @@ train:
   resume_dir: # exp/GRAN/your_exp_folder
   resume_model: #model_snapshot_0005000.pth
 test:
-  batch_size:20
+  batch_size: 20
   num_workers: 0
   num_test_gen: 20 # number of generated samples
   is_vis: true
@@ -69,5 +69,6 @@ test:
   vis_num_row: 1 # visualize `num_vis` samples in `vis_num_row` rows
   better_vis: true
   generated_graph_data_dir: generated_data
-  test_model_dir: exp/MCGRAN/45521
-  test_model_name: model_snapshot_0000298.pth
+  test_model_dir: exp/MCGRAN/52329
+  test_model_name: model_snapshot_0000030.pth
+

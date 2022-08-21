@@ -398,10 +398,6 @@ class GranRunner_Evaluation(object):
     return 1
 
   def test(self):
-      
-    # Use nasbench_full.tfrecord for full dataset (run download command above).
-    filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
-    nasbench = api.NASBench(filepath, seed = 1234)
 
     ### load model
     model = eval(self.model_conf.name)(self.config)
@@ -449,93 +445,9 @@ class GranRunner_Evaluation(object):
 
     logger.info('Average test time per mini-batch = {}'.format(
       np.mean(gen_run_time)))
-    
 
-#
-    new_graphs_gen = [nx.from_numpy_matrix(aa) for aa in A_pred]
-
-        
-    node_label_list = [graphs_gen_nodes[index].cpu().numpy().astype(np.int32).tolist() for index in range(len(graphs_gen_nodes))]
-
-    new_graphs_gen_nodes = node_label_list[0]
-
-    self.valid_graphs = []
-    self.accuracy_list = []
-    self.trainable_parameters_list = []
-    self.training_time_list = []
-    for index in range(self.num_test_gen):
-        
-#        matrix = np.triu(np.transpose(A_pred[index].astype(np.int32)))
-#        graph = nx.Graph(csr_matrix(matrix))
-        
-        graph = new_graphs_gen[index]
-        matrix = np.triu(nx.to_numpy_array(graph).astype(np.int32))
-
-#        graph = nx.Graph(csr_matrix(matrix))
-        
-#        matrix = nx.to_numpy_array(graph)
-        operations_encode = {'input':0, 'conv3x3-bn-relu':1, 'conv1x1-bn-relu':2, 'maxpool3x3':3, 'output':4}
-        operations_decode = {0:'input', 1:'conv3x3-bn-relu', 2:'conv1x1-bn-relu',
-            3:'maxpool3x3', 4:'output'}
-
-        ops = [operations_decode[node_index] for node_index in new_graphs_gen_nodes[index]]
-        # try:
-        spec = api.ModelSpec(matrix=matrix, ops=ops)
-    
-        if nasbench.is_valid(spec):
-            graph = nx.Graph(csr_matrix(spec.matrix))
-            ops = spec.ops
-            data = nasbench.query(spec, epochs=108)
-            if graph.number_of_nodes() == self.config.model.max_num_nodes:
-                for node_idx in range(graph.number_of_nodes()):
-                      graph.add_node(node_idx,
-                       label=operations_encode[ops[node_idx]])
-                self.valid_graphs.append(graph)
-                self.accuracy_list.append(data['test_accuracy'])
-                self.trainable_parameters_list.append(data['trainable_parameters'])
-                self.training_time_list.append(data['training_time'])
-    
-    print('Generated Graphs - Test Accuracy Statistics')
-    print('Mean ', np.mean(self.accuracy_list))
-    print('Standard Deviation ', np.std(self.accuracy_list))
-    print('Maximum ', np.max(self.accuracy_list))
-    print('Minimum ', np.min(self.accuracy_list))
-    print('Number of valid graphs ', len(self.accuracy_list))
-    pickle.dump(self.accuracy_list, open(os.path.join(self.config.save_dir, 'test_accuracy_gen.p'), 'wb'))
-
-    print('Generated Graphs - Model Trainable Parameters Statistics')
-    print('Mean ', np.mean(self.trainable_parameters_list))
-    print('Standard Deviation ', np.std(self.trainable_parameters_list))
-    print('Maximum ', np.max(self.trainable_parameters_list))
-    print('Minimum ', np.min(self.trainable_parameters_list))
-
-    print('Generated Graphs - Model Training Time Statistics')
-    print('Mean ', np.mean(self.training_time_list))
-    print('Standard Deviation ', np.std(self.training_time_list))
-    print('Maximum ', np.max(self.training_time_list))
-    print('Minimum ', np.min(self.training_time_list))
-    
-    num_nodes_train = [gg.number_of_nodes() for gg in self.graphs_train]
-    
-    #Compared with Validation Set
-    num_nodes_dev = [len(gg.nodes) for gg in self.graphs_dev]  # shape B X 1
-    
-    mmd_degree_dev, mmd_clustering_dev, mmd_4orbits_dev, mmd_spectral_dev = evaluate(self.graphs_train, self.graphs_dev, degree_only=False)
-    mmd_num_nodes_dev = compute_mmd([np.bincount(num_nodes_dev)], [np.bincount(num_nodes_train)], kernel=gaussian_emd)
-    
-    structure_evaluation_metrics = {}
-    structure_evaluation_metrics['num_nodes'] = mmd_num_nodes_dev
-    structure_evaluation_metrics['degree'] = mmd_degree_dev
-    structure_evaluation_metrics['clustering'] = mmd_clustering_dev
-    structure_evaluation_metrics['4orbits'] = mmd_4orbits_dev
-    structure_evaluation_metrics['spectral'] = mmd_spectral_dev
-    
-    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
-    pickle.dump(self.test_accuracy_train, open(os.path.join(self.config.save_dir, 'test_accuracy_train.p'), 'wb'))
-    pickle.dump(self.test_accuracy_test, open(os.path.join(self.config.save_dir, 'test_accuracy_test.p'), 'wb'))
-      
     ## Evaluate Generated Graphs
-    structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
+    structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train[:10], self.graphs_dev[:10], self.graphs_test[:10])
     
     logger.info("Test MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['test']['num_nodes'], 
                 structure_evaluation_metrics['test']['node_degree'], 
