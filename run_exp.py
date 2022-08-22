@@ -1,13 +1,12 @@
 import os
 import sys
 import torch
-#import logging
+import logging
 import traceback
 import numpy as np
 from pprint import pprint
 
-from runner.gran_runner_evaluation import GranRunner_Evaluation
-from runner.gran_runner_higher_order_search import GranRunner_Higher_Order_Search
+from runner import *
 
 from utils.logger import setup_logging
 from utils.arg_helper import parse_arguments, get_config
@@ -16,7 +15,7 @@ torch.set_printoptions(profile='full')
 
 
 def main():
-  print('code')
+
   args = parse_arguments()
   config = get_config(args.config_file, is_test=args.evaluate)
   np.random.seed(config.seed)
@@ -24,7 +23,7 @@ def main():
   torch.cuda.manual_seed_all(config.seed)
   config.use_gpu = config.use_gpu and torch.cuda.is_available()
   
-  print(config.device)
+
 
   # log info
   log_file = os.path.join(config.save_dir, "log_exp_{}.txt".format(config.run_id))

@@ -302,24 +302,25 @@ class MCGRAN(nn.Module):
 
     self.conditional_feature_extractor = nn.Sequential(
           nn.Linear(self.num_conditional_features, self.hidden_dim),
-          nn.BatchNorm1d(self.hidden_dim, self.hidden_dim))
+          nn.ReLU(inplace=True)          
+          )
     
     self.condition_alpha = nn.Sequential(
             nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim),
-            nn.BatchNorm1d(self.max_num_nodes*self.hidden_dim, self.hidden_dim)
+            nn.ReLU(inplace=True)
             )
     self.condition_beta = nn.Sequential(
             nn.Linear(self.hidden_dim, self.max_num_nodes*self.hidden_dim),
-            nn.BatchNorm1d(self.max_num_nodes*self.hidden_dim, self.hidden_dim)
+            nn.ReLU(inplace=True)
             )
 
     self.node_alpha = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.BatchNorm1d(self.hidden_dim, self.hidden_dim)
+            nn.ReLU(inplace=True)
             )
     self.node_beta = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.BatchNorm1d(self.hidden_dim, self.hidden_dim)
+            nn.ReLU(inplace=True)
             )
     
     self.node_normalize = nn.BatchNorm1d(self.hidden_dim)
@@ -378,7 +379,22 @@ class MCGRAN(nn.Module):
     """ generate adj in row-wise auto-regressive fashion """
 
     B, C, N_max, _ = A_pad.shape
-
+#    print(A_pad[0])
+#    print(A_pad[0][0].data)
+    edge_list = list()
+    for bb in range(B):
+        graph = nx.DiGraph(nx.from_numpy_array(A_pad[bb][0].data.cpu().numpy()).edges())
+        node_edges = dict()
+        for node_idx in range(N_max):
+            node_incoming_edge = list(graph.predecessors(node_idx))
+            if len(node_incoming_edge) == 0:
+                node_edges[node_idx] = 0
+            else:
+                node_edges[node_idx] = node_incoming_edge
+        edge_list.append(node_edges)
+    
+#    print(edge_list)
+#    print(edge_list.testing)
     A_pad = A_pad.view(B * C * N_max, -1)
     
 
@@ -458,9 +474,10 @@ class MCGRAN(nn.Module):
     beta_condition = beta_condition.reshape(B, N_max, self.hidden_dim)
     
     beta_state[:, 0, : ] = node_state[:, 0, : ] * alpha_condition[:, 0, :] +  beta_condition[:, 0, :]
-    for node_idx in range(1, N_max):
-        alpha_state[:, node_idx, : ] = node_state[:, node_idx, :] * self.node_alpha(node_state[:, node_idx-1, :]) * alpha_condition[:, node_idx, :]
-        beta_state[:, node_idx, : ] = alpha_state[:, node_idx, : ] +  self.node_beta(node_state[:, node_idx-1, :])  + beta_condition[:, node_idx, :]
+    for bb in range(B):
+        for node_idx in range(1, N_max):
+            alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(torch.sum(node_state[bb, edge_list[bb][node_idx], :], 0)) * alpha_condition[bb, node_idx, :]
+            beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(torch.sum(node_state[bb, edge_list[bb][node_idx], :], 0))  + beta_condition[bb, node_idx, :]
         
 #    print(node_state.shape)
 #    print(alpha_condition.shape)

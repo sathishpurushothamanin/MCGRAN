@@ -19,7 +19,7 @@ def parse_arguments():
       '-l',
       '--log_level',
       type=str,
-      default='INFO',
+      default='DEBUG',
       help="Logging Level, \
         DEBUG, \
         INFO, \

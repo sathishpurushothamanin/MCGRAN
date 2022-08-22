@@ -78,7 +78,6 @@ class GranRunner_Evaluation(object):
     self.use_gpu = config.use_gpu
     self.gpus = config.gpus
     self.device = config.device
-    print(config.save_dir)
 #    self.writer = SummaryWriter(config.save_dir)
     self.is_vis = config.test.is_vis
     self.better_vis = config.test.better_vis
@@ -102,7 +101,6 @@ class GranRunner_Evaluation(object):
         max_test_accuracy=config.dataset.max_test_accuracy,
         max_num_nodes=config.model.max_num_nodes)
 
-    print(len(self.dataset))
     self.train_ratio = config.dataset.train_ratio
     self.dev_ratio = config.dataset.dev_ratio
     self.block_size = config.model.block_size
@@ -126,25 +124,32 @@ class GranRunner_Evaluation(object):
     self.total_parameters = list()
     self.total_training_time = list()
     self.test_accuracy = list()
+#    self.node_in_edges = list()
     
     for data_item in self.dataset:
         self.graphs.append(data_item['graph'])
         self.total_parameters.append(data_item['total_parameters'])
         self.total_training_time.append(data_item['total_training_time'])
         self.test_accuracy.append(data_item['test_accuracy'])
+#        self.node_in_edges.append(data_item['node_in_edges'])
 
     self.graphs_train = self.graphs[:self.num_train]
     self.total_parameters_train = self.total_parameters[:self.num_train]
     self.total_training_time_train = self.total_training_time[:self.num_train]
     self.test_accuracy_train = self.test_accuracy[:self.num_train]
+#    self.node_in_edges_train = self.node_in_edges[:self.num_train]
+    
     self.graphs_dev = self.graphs[:self.num_dev]
     self.total_parameters_dev = self.total_parameters[:self.num_dev]
     self.total_training_time_dev = self.total_training_time[:self.num_dev]
     self.test_accuracy_dev = self.test_accuracy[:self.num_dev]
+#    self.node_in_edges_dev = self.node_in_edges[:self.num_dev]
+    
     self.graphs_test = self.graphs[self.num_train:]
     self.total_parameters_test = self.total_parameters[self.num_train:]
     self.total_training_time_test = self.total_training_time[self.num_train:]
     self.test_accuracy_test = self.test_accuracy[self.num_train:]
+#    self.node_in_edges_test = self.node_in_edges[self.num_train:]
 
     self.config.dataset.sparse_ratio = compute_edge_ratio(self.graphs_train)
     logger.info('No Edges vs. Edges in training set = {}'.format(
@@ -445,9 +450,9 @@ class GranRunner_Evaluation(object):
 
     logger.info('Average test time per mini-batch = {}'.format(
       np.mean(gen_run_time)))
-
+    
     ## Evaluate Generated Graphs
-    structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train[:10], self.graphs_dev[:10], self.graphs_test[:10])
+    structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
     
     logger.info("Test MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['test']['num_nodes'], 
                 structure_evaluation_metrics['test']['node_degree'], 

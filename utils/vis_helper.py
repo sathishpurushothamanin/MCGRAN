@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pydot
 
 def visualize_graphs(config, A_pred, graphs_train): 
-    graphs_gen = A_pred #[nx.from_numpy_matrix(aa) for aa in A_pred]
+    graphs_gen = [nx.from_numpy_matrix(aa) for aa in A_pred]
     is_vis = config.test.is_vis
     better_vis = config.test.better_vis
     num_vis = config.test.num_vis
