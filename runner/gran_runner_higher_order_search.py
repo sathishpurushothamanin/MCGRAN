@@ -48,6 +48,7 @@ from utils.runner_helper import display_model, add_labels
 from utils.runner_helper import output_dataset_csv, output_search_stats_csv
 
 from nasbench.api import OutOfDomainError
+from nasbench.lib import config
 #from nasbench.lib.model_spec import is_upper_triangular
 
 #from sklearn import metrics
@@ -67,6 +68,7 @@ except:
 # Use nasbench_full.tfrecord for full dataset (run download command above).
 #filepath = os.path.join('data/nas-101', 'nasbench_only108.tfrecord')
 #nasbench = api.NASBench(filepath, seed = 1234)
+nasbench_config = config.build_config()
     
 logger = get_logger('exp_logger')
 __all__ = ['GranRunner_Higher_Order_Search', 'compute_edge_ratio', 'get_graph', 'evaluate']
@@ -92,7 +94,7 @@ class GranRunner_Higher_Order_Search(object):
     self.num_gpus = len(self.gpus)
     self.is_shuffle = False
     
-    self.config.num_categories = 10
+    self.config.num_categories = config.model.node_categories
     self.config.model.tree_level = 0
     
     assert self.use_gpu == True
@@ -131,12 +133,14 @@ class GranRunner_Higher_Order_Search(object):
     self.total_parameters = list()
     self.total_training_time = list()
     self.test_accuracy = list()
-    
+    self.hash_list = set()
+    self.expanded_dataset_hash_list = set()
     for data_item in self.dataset:
         self.graphs.append(data_item['graph'])
         self.total_parameters.append(data_item['total_parameters'])
         self.total_training_time.append(data_item['total_training_time'])
         self.test_accuracy.append(data_item['test_accuracy'])
+        self.hash_list.add(data_item['hash'])
     
     self.all_datasets = {self.config.model.tree_level: {self.config.model.max_num_nodes: self.dataset}}
     
@@ -178,29 +182,29 @@ class GranRunner_Higher_Order_Search(object):
     self.search_gen_stats = list()
 
 
-    self.config.dataset.sparse_ratio = compute_edge_ratio(self.graphs_train)
-    logger.info('No Edges vs. Edges in training set = {}'.format(
-        self.config.dataset.sparse_ratio))
+#    self.config.dataset.sparse_ratio = compute_edge_ratio(self.graphs_train)
+#    logger.info('No Edges vs. Edges in training set = {}'.format(
+#        self.config.dataset.sparse_ratio))
 
     self.num_nodes_pmf_train = np.bincount([len(gg.nodes) for gg in self.graphs_train])
 #    self.max_num_nodes = len(self.num_nodes_pmf_train)
     self.num_nodes_pmf_train = self.num_nodes_pmf_train / self.num_nodes_pmf_train.sum()
 
     ### save split for benchmarking
-    if config.dataset.is_save_split:
-      base_path = os.path.join(config.dataset.data_path, 'save_split')
-      if not os.path.exists(base_path):
-        os.makedirs(base_path)
-
-      save_graph_list(
-          self.graphs_train,
-          os.path.join(base_path, '{}_train.p'.format(config.dataset.name)))
-      save_graph_list(
-          self.graphs_dev,
-          os.path.join(base_path, '{}_dev.p'.format(config.dataset.name)))
-      save_graph_list(
-          self.graphs_test,
-          os.path.join(base_path, '{}_test.p'.format(config.dataset.name)))
+#    if config.dataset.is_save_split:
+#      base_path = os.path.join(config.dataset.data_path, 'save_split')
+#      if not os.path.exists(base_path):
+#        os.makedirs(base_path)
+#
+#      save_graph_list(
+#          self.graphs_train,
+#          os.path.join(base_path, '{}_train.p'.format(config.dataset.name)))
+#      save_graph_list(
+#          self.graphs_dev,
+#          os.path.join(base_path, '{}_dev.p'.format(config.dataset.name)))
+#      save_graph_list(
+#          self.graphs_test,
+#          os.path.join(base_path, '{}_test.p'.format(config.dataset.name)))
 
 
   def train(self):
@@ -270,7 +274,6 @@ class GranRunner_Higher_Order_Search(object):
     results = defaultdict(list)
     for epoch in range(resume_epoch, self.train_conf.max_epoch):
       model.train()
-      lr_scheduler.step()
       train_iterator = train_loader.__iter__()
 
       pred_label_list = list()
@@ -296,6 +299,7 @@ class GranRunner_Higher_Order_Search(object):
               data = {}
               data['adj'] = batch_data[dd][ff]['adj'].pin_memory().to(gpu_id, non_blocking=True)
               data['edges'] = batch_data[dd][ff]['edges'].pin_memory().to(gpu_id, non_blocking=True)
+              data['edge_list'] = batch_data[dd][ff]['edge_list']
               data['node_idx_gnn'] = batch_data[dd][ff]['node_idx_gnn'].pin_memory().to(gpu_id, non_blocking=True)
               data['node_idx_feat'] = batch_data[dd][ff]['node_idx_feat'].pin_memory().to(gpu_id, non_blocking=True)
               data['label'] = batch_data[dd][ff]['label'].pin_memory().to(gpu_id, non_blocking=True)
@@ -303,7 +307,7 @@ class GranRunner_Higher_Order_Search(object):
               data['subgraph_idx'] = batch_data[dd][ff]['subgraph_idx'].pin_memory().to(gpu_id, non_blocking=True)
               data['subgraph_idx_base'] = batch_data[dd][ff]['subgraph_idx_base'].pin_memory().to(gpu_id, non_blocking=True)
               data['node_labels'] = batch_data[dd][ff]['node_labels'].pin_memory().to(gpu_id, non_blocking=True)
-              data['pseudo_coordinates'] = batch_data[dd][ff]['pseudo_coordinates'].pin_memory().to(gpu_id, non_blocking=True)
+#              data['pseudo_coordinates'] = batch_data[dd][ff]['pseudo_coordinates'].pin_memory().to(gpu_id, non_blocking=True)
               data['conditional_data'] = batch_data[dd][ff]['conditional_data'].pin_memory().to(gpu_id, non_blocking=True)
               batch_fwd.append((data,))
           if batch_fwd:
@@ -323,6 +327,7 @@ class GranRunner_Higher_Order_Search(object):
 
         clip_grad_norm_(model.parameters(), 5.0e-0)
         optimizer.step()
+        lr_scheduler.step()
         avg_train_loss /= float(self.dataset_conf.num_fwd_pass)
 
         # reduce
@@ -335,9 +340,6 @@ class GranRunner_Higher_Order_Search(object):
       results['train_loss'] += [train_loss]
       results['train_acc'] += [classifier_train_metrics['accuracy']]
       results['train_f1_score'] += [classifier_train_metrics['f1_score']]
-#      results['val_loss'] += [val_loss]
-#      results['val_acc'] += [classifier_validation_metrics['accuracy']]
-#      results['val_f1_score'] = [classifier_validation_metrics['f1_score']]
       results['train_step'] += [iter_count]
       
       print("Training Loss @ epoch {:04d}; Loss: {:.4f}; Accuracy: {:.4f}; Precision: {:.4f}; Recall: {:.4f}; F1 Score: {:.4f}".format(epoch + 1, train_loss, classifier_train_metrics['accuracy'], classifier_train_metrics['precision'], classifier_train_metrics['recall'], classifier_train_metrics['f1_score']))
@@ -431,21 +433,17 @@ class GranRunner_Higher_Order_Search(object):
                 ops = spec.ops
                 # fixed_stats, computed_stats = nasbench.get_metrics_from_spec(spec)
                 data = nasbench.query(spec, epochs=108)
-                additional_details = []
                 if graph.number_of_nodes() == self.config.model.max_num_nodes:
                     for node_idx in range(graph.number_of_nodes()):
                           graph.add_node(node_idx,
                            label=operations_encode[ops[node_idx]])
-                    self.valid_graphs.append(graph)
-                    self.accuracy_list.append(data['test_accuracy'])
-                    self.trainable_parameters_list.append(data['trainable_parameters'])
-                    self.training_time_list.append(data['training_time'])
-                    additional_details.append(f"Trainable parameters {data['trainable_parameters']}")
-                    additional_details.append(f"Training time {data['training_time']}")
-                    additional_details.append(f"Accuracy {data['test_accuracy']}")
-#                    draw_neural_architecture(graph, ops,
-#                        file_name=os.path.join(self.config.save_dir,
-#                        f"architecture_{index}.svg"), additional_details=additional_details)
+                    graph_hash = spec.hash_spec(nasbench_config['available_ops'])
+                    if graph_hash not in self.hash_list:
+                        self.valid_graphs.append(graph)
+                        self.accuracy_list.append(data['test_accuracy'])
+                        self.trainable_parameters_list.append(data['trainable_parameters'])
+                        self.training_time_list.append(data['training_time'])
+                        self.hash_list.add(graph_hash)
         except OutOfDomainError as OOD:
             #Todo
             #save invalid matrix and investigate
@@ -484,6 +482,7 @@ class GranRunner_Higher_Order_Search(object):
     #loop
 
     #set model and data selection dynamically
+
     for _ in range(100):
         #exploit
         #start time
@@ -537,7 +536,9 @@ class GranRunner_Higher_Order_Search(object):
     self.search_gen_stats = list()
     self.search_train_stats = list()
     self.accuracy_list = list()
-
+    self.hash_list = self.expanded_dataset_hash_list
+    self.expanded_dataset_hash_list = set()
+    
 #    print(self.config.model.max_num_nodes.test)
     self.all_datasets[self.config.model.tree_level].update({self.config.model.max_num_nodes: self.dataset})
     self.all_datasets[self.config.model.tree_level].update({self.config.model.max_num_nodes+1: self.expanded_dataset})
@@ -600,6 +601,8 @@ class GranRunner_Higher_Order_Search(object):
     self.search_gen_stats = list()
     self.search_train_stats = list()
     self.accuracy_list = list()
+    self.hash_list = self.expanded_dataset_hash_list
+    self.expanded_dataset_hash_list = set()
 #    free_up_cache()
 #    print(self.config.model.max_num_nodes)
 #    print(self.config.model.max_num_nodes.test)
@@ -669,6 +672,8 @@ class GranRunner_Higher_Order_Search(object):
     self.search_gen_stats = list()
     self.search_train_stats = list()
     self.accuracy_list = list()
+    self.hash_list = self.expanded_dataset_hash_list
+    self.expanded_dataset_hash_list = set()
     
     self.expanded_dataset = list()
     self.config.model.max_num_nodes = 5
@@ -741,14 +746,14 @@ class GranRunner_Higher_Order_Search(object):
     self.search_gen_stats = list()
     self.search_train_stats = list()
     self.accuracy_list = list()
+    self.hash_list = self.expanded_dataset_hash_list
+    self.expanded_dataset_hash_list = set()
 #    free_up_cache()
-    print(self.config.model.max_num_nodes)
+
     self.all_datasets[self.config.model.tree_level].update({self.config.model.max_num_nodes: self.dataset})
     self.all_datasets[self.config.model.tree_level][self.config.model.max_num_nodes+1].extend(self.expanded_dataset)
     self.dataset = self.all_datasets[self.config.model.tree_level][self.config.model.max_num_nodes+1]
-    print(self.dataset[0]['graph'].number_of_nodes())
-    print(self.all_datasets.keys())
-    print(self.all_datasets[1].keys())
+
     self.expanded_dataset = list()
     self.config.model.max_num_nodes = self.config.model.max_num_nodes+1
 #    self.max_num_nodes = self.config.model.max_num_nodes   
@@ -809,8 +814,10 @@ class GranRunner_Higher_Order_Search(object):
     self.search_gen_stats = list()
     self.search_train_stats = list()
     self.accuracy_list = list()
+    self.hash_list = self.expanded_dataset_hash_list
+    self.expanded_dataset_hash_list = set()
 #    free_up_cache()
-    print(self.config.model.max_num_nodes)
+
     self.all_datasets[self.config.model.tree_level].update({self.config.model.max_num_nodes: self.dataset})
     self.all_datasets[self.config.model.tree_level][self.config.model.max_num_nodes+1].extend(self.expanded_dataset)
     self.dataset = self.all_datasets[self.config.model.tree_level][self.config.model.max_num_nodes+1]
@@ -972,7 +979,7 @@ class GranRunner_Higher_Order_Search(object):
         all_node_degree_list.append(node_degree_list)
         
     new_graphs_gen = [nx.from_numpy_matrix(aa) for aa in A_pred_expanded]
-        
+#        
     node_label_list = [graphs_gen_nodes[index].cpu().numpy().astype(np.int32).tolist() for index in range(len(graphs_gen_nodes))]
 
     for index in range(len(node_label_list[0])):
@@ -1023,15 +1030,17 @@ class GranRunner_Higher_Order_Search(object):
                     for node_idx in range(graph.number_of_nodes()):
                           graph.add_node(node_idx,
                            label=operations_encode[ops[node_idx]])
-                          
-                    new_expanded_sample['graph'] = graph
-                    new_expanded_sample['test_accuracy'] = data['test_accuracy']
-                    new_expanded_sample['total_parameters'] = data['trainable_parameters']
-                    new_expanded_sample['total_training_time'] = data['training_time']
-                    self.expanded_dataset.append(new_expanded_sample)
-                    accuracy_list.append(data['test_accuracy'])
-                    trainable_parameters_list.append(data['trainable_parameters'])
-                    training_time_list.append(data['training_time'])
+                    graph_hash = spec.hash_spec(nasbench_config['available_ops'])
+                    if graph_hash not in self.expanded_dataset_hash_list:      
+                        new_expanded_sample['graph'] = graph
+                        new_expanded_sample['test_accuracy'] = data['test_accuracy']
+                        new_expanded_sample['total_parameters'] = data['trainable_parameters']
+                        new_expanded_sample['total_training_time'] = data['training_time']
+                        self.expanded_dataset_hash_list.add(graph_hash)
+                        self.expanded_dataset.append(new_expanded_sample)
+                        accuracy_list.append(data['test_accuracy'])
+                        trainable_parameters_list.append(data['trainable_parameters'])
+                        training_time_list.append(data['training_time'])
         except:
             #todo
             #save invalid matrix and investigate
@@ -1185,62 +1194,3 @@ class GranRunner_Higher_Order_Search(object):
 #    self.max_num_nodes = len(self.num_nodes_pmf_train)
 #    self.config.max
     self.num_nodes_pmf_train = self.num_nodes_pmf_train / self.num_nodes_pmf_train.sum()
-
-  def optimize(self):    
-    # nasbench.config['num_repeats'] = 1
-
-    # freeup cache
-    # free_up_cache()
-
-    ### load model
-    model = eval(self.model_conf.name)(self.config)
-    model_file = os.path.join(self.test_conf.test_model_dir, self.test_conf.test_model_name)
-    load_model(model, model_file, self.device)
-    
-
-
-    if self.use_gpu:
-        model = nn.DataParallel(model, device_ids=self.gpus).to(self.device)
-
-    model.eval()
-
-    #display model details
-    if self.config.model.display_detailed_model:
-        display_model(model)
-
-    #edge_predictor optimization
-    input_dict = {}
-    input_dict['is_sampling']=True
-    input_dict['batch_size']=self.test_conf.batch_size
-    input_dict['num_nodes_pmf']=self.num_nodes_pmf_train
-    edge_predictor_layer_name = 'module.output_theta.4.weight'
-    model.load_state_dict(evolution(model, edge_predictor_layer_name, input_dict, self.config))
-
-#    snapshot(model.module if self.use_gpu else model, model.optimizer, self.config, 0, scheduler=model.scheduler)
-
-
-    ### Generate Graphs
-    A_pred = []
-    num_nodes_pred = []
-    num_test_batch = int(np.ceil(self.num_test_gen / self.test_conf.batch_size))
-
-    gen_run_time = []
-    graphs_gen_nodes = []
-    for ii in tqdm(range(num_test_batch)):
-        with torch.no_grad():
-          start_time = time.time()
-          A_tmp, graphs_node_list = model(input_dict)
-          gen_run_time += [time.time() - start_time]
-          A_pred += [aa.data.cpu().numpy() for aa in A_tmp]
-          num_nodes_pred += [aa.shape[0] for aa in A_tmp]
-          graphs_gen_nodes.append(graphs_node_list)
-
-    logger.info('Average test time per mini-batch = {}'.format(
-      np.mean(gen_run_time)))
-
-    ### Evaluate Generated Graphs
-    evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
-    
-    ### Visualize Generated Graphs
-    visualize_graphs(self.config, A_pred, self.graphs_train)
-    

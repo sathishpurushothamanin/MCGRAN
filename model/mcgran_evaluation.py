@@ -258,7 +258,7 @@ class MCGRAN(nn.Module):
     self.num_mix_component = config.model.num_mix_component
     self.has_rand_feat = True # use random feature instead of 1-of-K encoding
     self.att_edge_dim = config.model.hidden_dim // 2 #128
-    self.num_conditional_features = 3 #self.config.num_categories
+    self.num_conditional_features = self.config.num_categories
 
 
     self.node_predictor = nn.Sequential(
@@ -297,8 +297,8 @@ class MCGRAN(nn.Module):
 #        nn.Linear(self.hidden_dim, self.hidden_dim),
 #        nn.ReLU(inplace=True))
     
-    self.spline_conv = SplineConv(self.hidden_dim, self.hidden_dim,
-                               2, self.max_num_nodes).to(self.device)
+#    self.spline_conv = SplineConv(self.hidden_dim, self.hidden_dim,
+#                               2, self.max_num_nodes).to(self.device)
 
     self.conditional_feature_extractor = nn.Sequential(
           nn.Linear(self.num_conditional_features, self.hidden_dim),
@@ -347,13 +347,13 @@ class MCGRAN(nn.Module):
         num_layer=self.num_GNN_layers,
         has_attention=self.has_attention)
 
-    self.node_decoder = GNN(
-        msg_dim=self.hidden_dim,
-        node_state_dim=self.hidden_dim,
-        edge_feat_dim=2 * self.att_edge_dim,
-        num_prop=self.num_GNN_prop,
-        num_layer=1,
-        has_attention=self.has_attention)
+#    self.node_decoder = GNN(
+#        msg_dim=self.hidden_dim,
+#        node_state_dim=self.hidden_dim,
+#        edge_feat_dim=2 * self.att_edge_dim,
+#        num_prop=self.num_GNN_prop,
+#        num_layer=1,
+#        has_attention=self.has_attention)
 
     ### Loss functions
     pos_weight = torch.ones([1]) * self.edge_weight
@@ -370,6 +370,7 @@ class MCGRAN(nn.Module):
   def _inference(self,
                  A_pad=None,
                  edges=None,
+                 edge_list=None,
                  node_idx_gnn=None,
                  node_idx_feat=None,
                  att_idx=None,
@@ -381,17 +382,17 @@ class MCGRAN(nn.Module):
     B, C, N_max, _ = A_pad.shape
 #    print(A_pad[0])
 #    print(A_pad[0][0].data)
-    edge_list = list()
-    for bb in range(B):
-        graph = nx.DiGraph(nx.from_numpy_array(A_pad[bb][0].data.cpu().numpy()).edges())
-        node_edges = dict()
-        for node_idx in range(N_max):
-            node_incoming_edge = list(graph.predecessors(node_idx))
-            if len(node_incoming_edge) == 0:
-                node_edges[node_idx] = 0
-            else:
-                node_edges[node_idx] = node_incoming_edge
-        edge_list.append(node_edges)
+#    edge_list = list()
+#    for bb in range(B):
+#        graph = nx.DiGraph(nx.from_numpy_array(A_pad[bb][0].data.cpu().numpy()).edges())
+#        node_edges = dict()
+#        for node_idx in range(N_max):
+#            node_incoming_edge = list(graph.predecessors(node_idx))
+#            if len(node_incoming_edge) == 0:
+#                node_edges[node_idx] = 0
+#            else:
+#                node_edges[node_idx] = node_incoming_edge
+#        edge_list.append(node_edges)
     
 #    print(edge_list)
 #    print(edge_list.testing)
@@ -472,15 +473,38 @@ class MCGRAN(nn.Module):
     
     alpha_condition = alpha_condition.reshape(B, N_max, self.hidden_dim)
     beta_condition = beta_condition.reshape(B, N_max, self.hidden_dim)
-    
-    beta_state[:, 0, : ] = node_state[:, 0, : ] * alpha_condition[:, 0, :] +  beta_condition[:, 0, :]
     for bb in range(B):
-        for node_idx in range(1, N_max):
-            alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(torch.sum(node_state[bb, edge_list[bb][node_idx], :], 0)) * alpha_condition[bb, node_idx, :]
-            beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(torch.sum(node_state[bb, edge_list[bb][node_idx], :], 0))  + beta_condition[bb, node_idx, :]
-        
+        for node_idx in range(N_max):
+            edges = edge_list[bb][0][node_idx]
+            if edges.nelement() == 0:
+                beta_state[bb, node_idx, : ] = node_state[bb, node_idx, : ] * alpha_condition[bb, node_idx, :] +  beta_condition[bb, node_idx, :]
+            if edges.nelement() == 1:
+                agg = node_state[bb, edges, :]
+                alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(agg) * alpha_condition[bb, node_idx, :]
+                beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(agg)  + beta_condition[bb, node_idx, :]
+            else:
+                agg = torch.sum(node_state[bb, edges, :], 0)
+                alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(agg) * alpha_condition[bb, node_idx, :]
+                beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(agg)  + beta_condition[bb, node_idx, :]
+#    print(edge_list)
+#    for bb in range(B):
+#        for node_idx in range(N_max):
+#            if edge_list[bb][0][node_idx] == 0:
+#                beta_state[bb, node_idx, : ] = node_state[bb, node_idx, : ] * alpha_condition[bb, node_idx, :] +  beta_condition[bb, node_idx, :]
+#            else:
+#                agg = torch.sum(node_state[bb, torch.tensor(edge_list[bb][0][node_idx]).long(), :], 0)
+#                alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(agg) * alpha_condition[bb, node_idx, :]
+#                beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(agg)  + beta_condition[bb, node_idx, :]
+#    beta_state[:, 0, : ] = node_state[:, 0, : ] * alpha_condition[:, 0, :] +  beta_condition[:, 0, :]
+#    for _ in range(self.num_GNN_prop):
+#        for bb in range(B):
+#            for node_idx in range(1, N_max):
+#                alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(torch.sum(node_state[bb, edge_list[bb][node_idx], :], 0)) * alpha_condition[bb, node_idx, :]
+#                beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(torch.sum(node_state[bb, edge_list[bb][node_idx], :], 0))  + beta_condition[bb, node_idx, :]
+#            
 #    print(node_state.shape)
 #    print(alpha_condition.shape)
+#    print(node_state.testing)
     node_state = self.node_normalize(beta_state.reshape(B * C * N_max, self.hidden_dim))
     
 #    node_state = node_state * alpha_condition
@@ -617,7 +641,21 @@ class MCGRAN(nn.Module):
           A = A + A.transpose(1, 2)
 
         A_pad = A.view(B, N, -1)
+        
+        
 
+        
+#        for bb in range(B):
+#            graph = nx.DiGraph(nx.from_numpy_array(A_pad[bb].data.cpu().numpy()).edges())
+#            node_edges = dict()
+#            for node_idx in range(N):
+#                try:
+#                    node_incoming_edge = list(graph.predecessors(node_idx))
+#                    node_edges[node_idx] = node_incoming_edge
+#                except:
+#                    node_edges[node_idx] = node_idx
+#            edge_list.append(node_edges)
+        
         node_feat = self.decoder_node_input(A_pad).view(B * N, -1)
         
         
@@ -628,10 +666,32 @@ class MCGRAN(nn.Module):
         
         alpha_condition = alpha_condition.reshape(B, N, self.hidden_dim)
         beta_condition = beta_condition.reshape(B, N, self.hidden_dim)
-        beta_state[:, 0, : ] = node_state[:, 0, : ] * alpha_condition[:, 0, :] +  beta_condition[:, 0, :]
-        for node_idx in range(1, N):
-            alpha_state[:, node_idx, : ] = node_state[:, node_idx, :] * self.node_alpha(node_state[:, node_idx-1, :]) * alpha_condition[:, node_idx, :]
-            beta_state[:, node_idx, : ] = alpha_state[:, node_idx, : ] +  self.node_beta(node_state[:, node_idx-1, :])  + beta_condition[:, node_idx, :]
+#        edge_list = list()
+        for bb in range(B):
+            for node_idx in range(N):
+                edges = torch.nonzero(A_pad[bb][node_idx])
+                if edges.nelement() == 0:
+                    beta_state[bb, node_idx, : ] = node_state[bb, node_idx, : ] * alpha_condition[bb, node_idx, :] +  beta_condition[bb, node_idx, :]
+                if edges.nelement() == 1:
+                    agg = node_state[bb, edges, :]
+                    alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(agg) * alpha_condition[bb, node_idx, :]
+                    beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(agg)  + beta_condition[bb, node_idx, :]
+                else:
+                    agg = torch.sum(node_state[bb, edges, :], 0)
+                    alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(agg) * alpha_condition[bb, node_idx, :]
+                    beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(agg)  + beta_condition[bb, node_idx, :]
+            
+#        beta_state[:, 0, : ] = node_state[:, 0, : ] * alpha_condition[:, 0, :] +  beta_condition[:, 0, :]
+#        
+#        for _ in range(self.num_GNN_prop):
+#            for bb in range(B):
+#                for node_idx in range(N):
+#                    if not isinstance(edge_list[bb][node_idx], int):
+#                        agg = torch.sum(node_state[bb, edge_list[bb][node_idx], :], 0)
+#                    else:
+#                        
+#                    alpha_state[bb, node_idx, : ] = node_state[bb, node_idx, :] * self.node_alpha(agg) * alpha_condition[bb, node_idx, :]
+#                    beta_state[bb, node_idx, : ] = alpha_state[bb, node_idx, : ] +  self.node_beta(agg)  + beta_condition[bb, node_idx, :]
 
         node_state = self.node_normalize(beta_state.reshape(B * N, self.hidden_dim))
     
@@ -747,6 +807,7 @@ class MCGRAN(nn.Module):
     subgraph_idx = input_dict[
         'subgraph_idx'] if 'subgraph_idx' in input_dict else None
     edges = input_dict['edges'] if 'edges' in input_dict else None
+    edge_list = input_dict['edge_list'] if 'edge_list' in input_dict else None
     label = input_dict['label'] if 'label' in input_dict else None
     num_nodes_pmf = input_dict[
         'num_nodes_pmf'] if 'num_nodes_pmf' in input_dict else None
@@ -768,6 +829,7 @@ class MCGRAN(nn.Module):
       log_theta, log_alpha, pred_node_labels = self._inference(
           A_pad=A_pad,
           edges=edges,
+          edge_list=edge_list,
           node_idx_gnn=node_idx_gnn,
           node_idx_feat=node_idx_feat,
           att_idx=att_idx,

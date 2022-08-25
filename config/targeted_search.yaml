@@ -1,20 +1,20 @@
 ---
-exp_name: Higher_Order_Search
-exp_dir: exp/Higher_Order_Search
-runner: GranRunner_Higher_Order_Search
+exp_name: Targeted_Search
+exp_dir: exp/Targeted_Search
+runner: GranRunner_Targeted_Search
 use_horovod: False
 use_gpu: True
-device: cuda:3
-gpus: [3]
+device: cuda:6
+gpus: [6]
 seed: 67812345
 free_cache: False
 dataset:
-  loader_name: GRANData_Search
+  loader_name: GRANData_Targeted_Search
   name: nas
   data_path: data/nas-101/
   max_num_samples: 100
   min_test_accuracy: 0
-  max_test_accuracy: 75
+  max_test_accuracy: 100
   node_order: none # k_core/BFS/degree_decent
   train_ratio: 0.8
   dev_ratio: 0.2
@@ -30,8 +30,8 @@ model:
   is_sym: False
   block_size: 1
   sample_stride: 1
-  max_num_nodes: 5
-  node_categories: 10
+  max_num_nodes: 7
+  node_categories: 3
   hidden_dim: 256
   embedding_dim: 256
   num_GNN_layers: 7
@@ -46,10 +46,10 @@ train:
   lr_decay: 0.1
   lr_decay_epoch: [100000000] # no decay
   num_workers: 0
-  max_epoch: 100
+  max_epoch: 50
   batch_size: 20
   display_iter: 10
-  snapshot_epoch: 100
+  snapshot_epoch: 50
   valid_epoch: 50
   lr: 1.0e-4
   wd: 0.0e-4

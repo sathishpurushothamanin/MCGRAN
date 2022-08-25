@@ -185,8 +185,6 @@ def create_graphs(graph_type, data_dir='data', max_num_samples=1000, min_test_ac
 #  data_dir = '/content/drive/MyDrive/GRAN-NEW/GRAN-NAS-Pipeline/data/NAS-101'
 
   graphs = []
-  total_parameters = list()
-  total_training_time = list()
   filename = f'nasbench_{max_num_samples}_{min_test_accuracy}_{max_test_accuracy}_{max_num_nodes}.tfrecord'
   if graph_type == 'nas':
       #add node labels to the dataset
@@ -216,7 +214,16 @@ def create_graphs(graph_type, data_dir='data', max_num_samples=1000, min_test_ac
                   data_item['total_parameters'] = metrics.trainable_parameters
                   data_item['total_training_time'] = metrics.evaluation_data[2].training_time
                   data_item['test_accuracy'] = metrics.evaluation_data[2].test_accuracy
-                  
+                  data_item['hash'] = module_hash
+#                  edges = dict()
+#                  graph = nx.DiGraph(csr_matrix(adjacency))
+#                  for node_idx in range(max_num_nodes):
+#                    node_incoming_edge = list(graph.predecessors(node_idx))
+#                    if len(node_incoming_edge) == 0:
+#                        edges[node_idx] = 0
+#                    else:
+#                        edges[node_idx] = node_incoming_edge
+#                  data_item['node_in_edges'] = edges
                   nas_dataset.append(data_item)
 
         else:
@@ -247,7 +254,16 @@ def create_graphs(graph_type, data_dir='data', max_num_samples=1000, min_test_ac
                           data_item['total_parameters'] = metrics.trainable_parameters
                           data_item['total_training_time'] = metrics.evaluation_data[2].training_time
                           data_item['test_accuracy'] = metrics.evaluation_data[2].test_accuracy
-                          
+                          data_item['hash'] = module_hash
+#                          edges = dict()
+#                          graph = nx.DiGraph(csr_matrix(adjacency))
+#                          for node_idx in range(max_num_nodes):
+#                            node_incoming_edge = list(graph.predecessors(node_idx))
+#                            if len(node_incoming_edge) == 0:
+#                                edges[node_idx] = 0
+#                            else:
+#                                edges[node_idx] = node_incoming_edge
+#                          data_item['node_in_edges'] = edges
                           nas_dataset.append(data_item)
                           count += 1
 
