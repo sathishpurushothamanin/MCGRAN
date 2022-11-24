@@ -67,11 +67,10 @@ For RTX 3090
   ```conda env create -f gran_nas_rtx_3090.yml```
 
 
-
 ## Run Demos
 
 ### Train
-* To run the training of experiment ```X``` where ```X``` is one of {```gran_nas_evaluation.yaml```, ```gran_nas_higher_order_search.yaml```, ```mcgran.yaml```, ```targeted_search.yaml```}:
+* To run the training of experiment ```X``` where ```X``` is one of {```gran_nas_evaluation.yaml```, ```mcgran.yaml```}:
 
   ```python run_exp.py -c config/X -t```
 
@@ -87,9 +86,15 @@ For RTX 3090
 
   ```test_model: exp/gran_grid/xxx/model_snapshot_best.pth```
 
-* To run the test of experiments ```X```:
+* To run the test of experiments ```X``` where ```X``` is one of {```gran_nas_evaluation.yaml```, ```mcgran.yaml```}:
 
   ```python run_exp.py -c config/X -e```
+
+### Search 
+
+* To search neural network architectures ```X``` where ```X``` is one of {```gran_nas_higher_order_search.yaml```, ```targeted_search.yaml```}::
+
+  ```python run_exp.py -c config/X -s```
 
 **Note**:
 
