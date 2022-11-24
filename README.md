@@ -32,11 +32,22 @@ Other dependencies can be installed via
 
   ```pip install -r requirements.txt```
 
+## Conda installation
+
+In general,
+
+  ```conda env create -f mackenzie.yml```
+
+For RTX 3090
+
+  ```conda env create -f gran_nas_rtx_3090.yml```
+
+
 
 ## Run Demos
 
 ### Train
-* To run the training of experiment ```X``` where ```X``` is one of {```gran_nas_evaluation.yaml```, ```gran_DD```, ```gran_DB```, ```gran_lobster```}:
+* To run the training of experiment ```X``` where ```X``` is one of {```gran_nas_evaluation.yaml```, ```gran_nas_higher_order_search.yaml```, ```mcgran.yaml```, ```targeted_search.yaml```}:
 
   ```python run_exp.py -c config/X -t```
 
