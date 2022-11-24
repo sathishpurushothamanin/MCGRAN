@@ -1,27 +1,3 @@
-# Multi-Conditional GRAN for graph generation
-
-
-**Cite our work**:
-```
-@unpublished{purushothaman2023mcgran,
-  title={MC-GRAN: Multi-Conditional Graph Generation for Neural Architecture Search},
-  author={Purushothaman, Sathish and Stier, Julian and Granitzer, Michael},
-  year={2023}
-}
-```
-
-
-## Installation
-- Depending on your system capabilities choose one of the available conda environment files, e.g. *sur-mcgran-cpu.yml*
-- Install the dependencies ``conda env create -f sur-mcgran-cpu.yml``
-- Activate the environment ``conda activate sur-mcgran-cpu``
-
-
-
--------------------
-
-
-
 # GRAN-NAS-Pipeline
 
 The repository is derived from the original GRAN github repository: https://github.com/lrjconan/GRAN.
@@ -107,13 +83,14 @@ We also compute the orbit counts for each graph, represented as a high-dimension
 in directory eval/orca. (the binary file already in repo works in Ubuntu).
 
 
-## Sampled Graphs from GRAN
+## Sampled Graphs from MCGRAN
 
-* Proteins Graphs from Training Set:
-![](http://www.cs.toronto.edu/~rjliao/imgs/protein_train.png)
+* Valid neural networks:
+![](/samples/rq2_valid_nn.PNG)
 
-* Proteins Graphs Sampled from GRAN:
-![](http://www.cs.toronto.edu/~rjliao/imgs/protein_sample.png)
+* Invalid neural networks:
+![](/samples/rq2_invalid_nn.PNG)
+
 
 ## Cite
 Please cite our paper if you use this code in your research work.
