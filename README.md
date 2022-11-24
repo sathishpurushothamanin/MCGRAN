@@ -1,3 +1,27 @@
+# Multi-Conditional GRAN for graph generation
+
+
+**Cite our work**:
+```
+@unpublished{purushothaman2023mcgran,
+  title={MC-GRAN: Multi-Conditional Graph Generation for Neural Architecture Search},
+  author={Purushothaman, Sathish and Stier, Julian and Granitzer, Michael},
+  year={2023}
+}
+```
+
+
+## Installation
+- Depending on your system capabilities choose one of the available conda environment files, e.g. *sur-mcgran-cpu.yml*
+- Install the dependencies ``conda env create -f sur-mcgran-cpu.yml``
+- Activate the environment ``conda activate sur-mcgran-cpu``
+
+
+
+-------------------
+
+
+
 # GRAN-NAS-Pipeline
 
 The repository is derived from the original GRAN github repository: https://github.com/lrjconan/GRAN.
