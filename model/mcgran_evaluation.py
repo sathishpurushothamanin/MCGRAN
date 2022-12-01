@@ -258,7 +258,7 @@ class MCGRAN(nn.Module):
     self.num_mix_component = config.model.num_mix_component
     self.has_rand_feat = True # use random feature instead of 1-of-K encoding
     self.att_edge_dim = config.model.hidden_dim // 2 #128
-    self.num_conditional_features = self.config.num_categories
+    self.num_conditional_features = config.model.node_categories
 
 
     self.node_predictor = nn.Sequential(

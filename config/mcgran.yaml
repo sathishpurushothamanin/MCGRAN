@@ -4,15 +4,15 @@ exp_dir: exp/MCGRAN
 runner: GranRunner_Evaluation
 use_horovod: false
 use_gpu: true
-device: cuda:0
-gpus: [0]
-seed: 67812345
+device: cuda:7
+gpus: [7]
+seed: 78123456
 free_cache: false
 dataset:
   loader_name: GRANData_Node_Level
   name: nas
   data_path: data/nas-101/
-  max_num_samples: 100
+  max_num_samples: 1000
   min_test_accuracy: 80
   max_test_accuracy: 100
   node_order: none # k_core/BFS/degree_decent
@@ -26,7 +26,7 @@ dataset:
   is_overwrite_precompute: false
 model:
   name: MCGRAN
-  num_mix_component: 64
+  num_mix_component: 20
   is_sym: false
   block_size: 1
   sample_stride: 1
