@@ -16,26 +16,26 @@ In general,
   ```conda env create -f sur-mcgran-gpu.yml```
 
 # install nasbench instructions
-´´´
+```
 git clone https://github.com/google-research/nasbench
 cd nasbench
 pip install -e .
-´´´
+```
 
 # Tensorflow nasbench updates for 2.0
-´´´
+```
 tf.estimator.SessionRunHook instead of tf.train.SessionRunHook in nashbench\lib\training_time.py
 tf.estimator.NanLossDuringTrainingError instead of tensorflow._api.v2.train.NanLossDuringTrainingError in nashbench\lib\evaluate.py
 tf.compat.v1.python_io.tf_record_iterator instead of tf.python_io.tf_record_iterator in nasbench\api.py
-´´´
+```
 
 # dataset download instructions
-´´´
+```
 cd data
 mkdir nas-101
 cd nas-101
 curl -O https://storage.googleapis.com/nasbench/nasbench_only108.tfrecord
-´´´
+```
 
 ## Run Demos
 
