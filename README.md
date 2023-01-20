@@ -2,29 +2,6 @@
 
 The repository is derived from the original GRAN github repository: https://github.com/lrjconan/GRAN.
 
-# GRAN
-
-Efficient Graph Generation with Graph Recurrent Attention Networks(https://arxiv.org/abs/1910.00760) as described in the following NeurIPS 2019 paper:
-
-```
-@inproceedings{liao2019gran,
-  title={Efficient Graph Generation with Graph Recurrent Attention Networks},
-  author={Liao, Renjie and Li, Yujia and Song, Yang and Wang, Shenlong and Nash, Charlie and Hamilton, William L. and Duvenaud, David and Urtasun, Raquel and Zemel, Richard},
-  booktitle={NeurIPS},
-  year={2019}
-}
-```
-
-## Visualization
-
-### Generation of GRAN per step:
-![](http://www.cs.toronto.edu/~rjliao/imgs/gran_model.gif)
-
-
-### Overall generation process:
-<img src="http://www.cs.toronto.edu/~rjliao/imgs/gran_generation.gif" height="400px" width="550px" />
-
-
 ## Dependencies
 Python 3, PyTorch(1.2.0)
 
@@ -36,12 +13,25 @@ Other dependencies can be installed via
 
 In general,
 
-  ```conda env create -f mackenzie.yml```
+  ```conda env create -f sur-mcgran-gpu.yml```
 
-For RTX 3090
+# install nasbench instructions
+#to do
+git clone https://github.com/google-research/nasbench
+cd nasbench
+pip install -e .
 
-  ```conda env create -f gran_nas_rtx_3090.yml```
+# Tensorflow nasbench updates for 2.0
 
+tf.estimator.SessionRunHook instead of tf.train.SessionRunHook in nashbench\lib\training_time.py
+tf.estimator.NanLossDuringTrainingError instead of tensorflow._api.v2.train.NanLossDuringTrainingError in nashbench\lib\evaluate.py
+tf.compat.v1.python_io.tf_record_iterator instead of tf.python_io.tf_record_iterator in nasbench\api.py
+
+# dataset download instructions
+cd data
+mkdir nas-101
+cd nas-101
+curl -O https://storage.googleapis.com/nasbench/nasbench_only108.tfrecord
 
 ## Run Demos
 
