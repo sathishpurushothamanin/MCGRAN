@@ -66,16 +66,6 @@ curl -O https://storage.googleapis.com/nasbench/nasbench_only108.tfrecord
 
   ```python run_exp.py -c config/X -s```
 
-**Note**:
-
-* Please check the [evaluation](https://github.com/JiaxuanYou/graph-generation) to set up.
-
-We also compute the orbit counts for each graph, represented as a high-dimensional data point. We then compute the MMD between the two sets of sampled points using ORCA (see http://www.biolab.si/supp/orca/orca.html) at eval/orca. One first needs to compile ORCA by
-
-    ```g++ -O2 -std=c++11 -o orca orca.cpp```
-    
-in directory eval/orca. (the binary file already in repo works in Ubuntu).
-
 
 ## Sampled Graphs from MCGRAN
 
