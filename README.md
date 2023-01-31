@@ -78,7 +78,7 @@ curl -O https://storage.googleapis.com/nasbench/nasbench_only108.tfrecord
 
 ##Targeted Search
 Our iterative algorithm along with MCGRAN continuously samples novel architecture with higher (targeted) test accuracy.
-![](/samples/targeted_search.PNG)
+![](/samples/targeted_search.png)
 
 ## Cite
 Please cite our paper if you use this code in your research work.
