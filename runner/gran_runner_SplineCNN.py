@@ -9,9 +9,10 @@ from collections import defaultdict
 from tqdm import tqdm
 import networkx as nx
 from scipy.sparse import csr_matrix
+from nasbench.lib import model_metrics_pb2
 import base64
 import json
-
+from nasbench import api
 
 
 import torch
@@ -36,18 +37,19 @@ from utils.data_parallel import DataParallel
 from scipy.sparse import csr_matrix
 from utils.nas_evaluation_helper import *
 
-#from nas_101_api.nas101_model import *
-#from nas_101_api.nas101_model import *
+from nas_101_api.nas101_model import *
+from nas_101_api.nas101_model import *
 # from runner.geometric_processing import *
 
 #from utils.runner_helper import print_info, free_up_cache
-# from utils.runner_helper import compute_edge_ratio, get_graph
-# from utils.runner_helper import evaluate_metrics, evaluate, validation_metrics
-# from utils.runner_helper import evolution
-# from utils.runner_helper import display_model
-
-from utils.runner_helper import *
+from utils.runner_helper import compute_edge_ratio, get_graph
+from utils.runner_helper import evaluate_metrics, evaluate, validation_metrics
+from utils.runner_helper import evolution
+from utils.runner_helper import display_model
 from utils.dist_helper import compute_mmd, gaussian_emd
+from nasbench import api
+from nasbench.lib.model_spec import is_upper_triangular
+
 
 from sklearn import metrics
 try:
@@ -61,12 +63,10 @@ try:
 except:
   pass
 
-from utils.nasbench_dataset import *
-
 logger = get_logger('exp_logger')
-__all__ = ['GranRunner_Evaluation', 'compute_edge_ratio', 'get_graph', 'evaluate']
+__all__ = ['GranRunner_SplineCNN', 'compute_edge_ratio', 'get_graph', 'evaluate']
 
-class GranRunner_Evaluation(object):
+class GranRunner_SplineCNN(object):
 
   def __init__(self, config):
     self.config = config
@@ -92,8 +92,7 @@ class GranRunner_Evaluation(object):
 
     if self.train_conf.is_resume:
       self.config.save_dir = self.train_conf.resume_dir
-     
-    self.config.num_categories = config.model.node_categories
+
     ### load graphs
     self.dataset = create_graphs(config.dataset.name,
         data_dir=config.dataset.data_path,
@@ -274,7 +273,6 @@ class GranRunner_Evaluation(object):
               data = {}
               data['adj'] = batch_data[dd][ff]['adj'].pin_memory().to(gpu_id, non_blocking=True)
               data['edges'] = batch_data[dd][ff]['edges'].pin_memory().to(gpu_id, non_blocking=True)
-              data['edge_list'] = batch_data[dd][ff]['edge_list']
               data['node_idx_gnn'] = batch_data[dd][ff]['node_idx_gnn'].pin_memory().to(gpu_id, non_blocking=True)
               data['node_idx_feat'] = batch_data[dd][ff]['node_idx_feat'].pin_memory().to(gpu_id, non_blocking=True)
               data['label'] = batch_data[dd][ff]['label'].pin_memory().to(gpu_id, non_blocking=True)
@@ -282,6 +280,7 @@ class GranRunner_Evaluation(object):
               data['subgraph_idx'] = batch_data[dd][ff]['subgraph_idx'].pin_memory().to(gpu_id, non_blocking=True)
               data['subgraph_idx_base'] = batch_data[dd][ff]['subgraph_idx_base'].pin_memory().to(gpu_id, non_blocking=True)
               data['node_labels'] = batch_data[dd][ff]['node_labels'].pin_memory().to(gpu_id, non_blocking=True)
+              data['pseudo_coordinates'] = batch_data[dd][ff]['pseudo_coordinates'].pin_memory().to(gpu_id, non_blocking=True)
               data['conditional_data'] = batch_data[dd][ff]['conditional_data'].pin_memory().to(gpu_id, non_blocking=True)
               batch_fwd.append((data,))
           if batch_fwd:
@@ -451,44 +450,10 @@ class GranRunner_Evaluation(object):
 
     logger.info('Average test time per mini-batch = {}'.format(
       np.mean(gen_run_time)))
-      
-    operations = {0:'input', 1:'conv3x3-bn-relu', 2:'conv1x1-bn-relu',
-            3:'maxpool3x3', 4:'output'}
-    
-    node_label_vis = graphs_gen_nodes[0]
-    graphs_gen = list()
-    for index in range(self.config.test.batch_size):
-        matrix = np.triu(np.transpose(A_pred[index].astype(np.int32)))
-        graph = nx.Graph(csr_matrix(matrix))
-    
-        ops = [operations[node_index] for node_index in node_label_vis[index].cpu().numpy().astype(np.int32)]
-        graphs_gen.append(add_labels(graph, ops))
-    
-    pickle.dump(graphs_gen, open(os.path.join(self.config.save_dir, 'graphs_gen.p'), 'wb'))
-    pickle.dump(self.graphs_train, open(os.path.join(self.config.save_dir, 'graphs_train.p'), 'wb'))
-    pickle.dump(self.graphs_dev, open(os.path.join(self.config.save_dir, 'graphs_dev.p'), 'wb'))
-    pickle.dump(self.graphs_test, open(os.path.join(self.config.save_dir, 'graphs_test.p'), 'wb'))
-    
-    # structure_evaluation_metrics = validate_mmd_metrics(graphs_gen, graphs_train, graphs_dev, graphs_test)
-    # metrics = validate_structural_metrics(graphs_gen)
-
-    # structure_evaluation_metrics['self_loops'] = metrics['self_loops']
-    # structure_evaluation_metrics['isolated_nodes'] = metrics['isolated_nodes']
-    # structure_evaluation_metrics['invalid_nn'] = metrics['invalid_nn']
-
-    #metrics = validate_graph_quality_metrics(graphs_train, graphs_gen)
-
-    #structure_evaluation_metrics['novelty'] = metrics['novelty']
-    #structure_evaluation_metrics['uniqueness'] = metrics['uniqueness']
     
     ## Evaluate Generated Graphs
     structure_evaluation_metrics = evaluate_metrics(self.config, A_pred, graphs_gen_nodes, self.graphs_train, self.graphs_dev, self.graphs_test)
     
-    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
-
-    ### Visualize Generated Graphs
-    visualize_graphs(self.config, A_pred, self.graphs_train)
-        
     logger.info("Test MMD scores of #nodes/degree/clustering/4orbits/spectral/NSPDK are = {:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}/{:.4f}".format(structure_evaluation_metrics['test']['num_nodes'], 
                 structure_evaluation_metrics['test']['node_degree'], 
                 structure_evaluation_metrics['test']['node_clustering'], 
@@ -515,4 +480,6 @@ class GranRunner_Evaluation(object):
     for key in sorted(structure_evaluation_metrics['novelty']):
         logger.info("{}: {}".format(key, round(structure_evaluation_metrics['novelty'][key], 2)))
         
-
+    pickle.dump(structure_evaluation_metrics, open(os.path.join(self.config.save_dir, 'structure_evaluation_metrics.p'), 'wb'))
+    ### Visualize Generated Graphs
+    visualize_graphs(self.config, A_pred, self.graphs_train)

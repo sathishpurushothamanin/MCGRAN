@@ -1,7 +1,7 @@
 ---
 exp_name: EVALUATION
 exp_dir: exp/EVALUATION
-runner: GranRunner_Evaluation
+runner: GranRunner_SplineCNN
 use_horovod: false
 use_gpu: true
 device: cuda:0
@@ -48,7 +48,7 @@ train:
   max_epoch: 300
   batch_size: 20
   display_iter: 10
-  snapshot_epoch: 300
+  snapshot_epoch: 250
   valid_epoch: 50
   lr: 1.0e-4
   wd: 0.0e-4
@@ -59,9 +59,9 @@ train:
   resume_dir: # exp/GRAN/your_exp_folder
   resume_model: #model_snapshot_0005000.pth
 test:
-  batch_size: 10
+  batch_size: 100
   num_workers: 0
-  num_test_gen: 10 # number of generated samples
+  num_test_gen: 100 # number of generated samples
   is_vis: true
   is_single_plot: false # visualize `num_vis` samples in a single image
   is_test_ER: false # test Erdos-Renyi baseline

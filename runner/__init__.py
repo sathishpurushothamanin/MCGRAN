@@ -1,3 +1,5 @@
 from runner.gran_runner_evaluation import GranRunner_Evaluation
 from runner.gran_runner_higher_order_search import GranRunner_Higher_Order_Search
 from runner.gran_runner_targeted_search import GranRunner_Targeted_Search
+
+from runner.gran_runner_SplineCNN import GranRunner_SplineCNN

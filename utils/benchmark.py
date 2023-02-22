@@ -24,7 +24,7 @@ import networkx as nx
 from utils.nas_evaluation_helper import *
 from utils.runner_helper import *
 from utils.dist_helper import compute_mmd, gaussian_emd, gaussian, emd, gaussian_tv
-
+from utils.nasbench_dataset import *
 from nasbench import api
 
 # Use nasbench_full.tfrecord for full dataset (run download command above).

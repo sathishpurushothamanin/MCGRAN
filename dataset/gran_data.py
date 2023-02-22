@@ -1232,7 +1232,7 @@ class GRANData_Search(object):
 
       node_edges = dict()
       for node_idx in range(N):
-        node_edges[node_idx] = torch.nonzero(adj_list[0][node_idx])
+        node_edges[node_idx] = torch.nonzero(torch.tensor(adj_list[0][node_idx]))
                 
 #      graph = nx.DiGraph(nx.from_numpy_array(np.tril(adj_list[0])).edges())
 #      node_edges = dict()

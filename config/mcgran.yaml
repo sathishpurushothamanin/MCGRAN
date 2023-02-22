@@ -4,12 +4,12 @@ exp_dir: exp/MCGRAN
 runner: GranRunner_Evaluation
 use_horovod: false
 use_gpu: true
-device: cuda:7
-gpus: [7]
+device: cuda:0
+gpus: [0]
 seed: 78123456
 free_cache: false
 dataset:
-  loader_name: GRANData_Node_Level
+  loader_name: GRANData_Targeted_Search
   name: nas
   data_path: data/nas-101/
   max_num_samples: 1000
@@ -26,7 +26,7 @@ dataset:
   is_overwrite_precompute: false
 model:
   name: MCGRAN
-  num_mix_component: 20
+  num_mix_component: 64
   is_sym: false
   block_size: 1
   sample_stride: 1
@@ -49,7 +49,7 @@ train:
   max_epoch: 300
   batch_size: 20
   display_iter: 10
-  snapshot_epoch: 300
+  snapshot_epoch: 250
   valid_epoch: 50
   lr: 1.0e-4
   wd: 0.0e-4
@@ -70,6 +70,6 @@ test:
   vis_num_row: 1 # visualize `num_vis` samples in `vis_num_row` rows
   better_vis: true
   generated_graph_data_dir: generated_data
-  test_model_dir: exp/MCGRAN/58724
-  test_model_name: model_snapshot_0000281.pth
+  test_model_dir: exp/MCGRAN/13017
+  test_model_name: model_snapshot_0000290.pth
 
