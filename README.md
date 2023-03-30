@@ -83,6 +83,3 @@ Our iterative algorithm along with MCGRAN continuously samples novel architectur
 
 ## Cite
 Please cite our paper if you use this code in your research work.
-
-## Questions/Bugs
-Please submit a Github issue or contact sathish.corley@gmail.com if you have any questions or find any bugs.
